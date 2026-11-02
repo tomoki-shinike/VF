@@ -1,0 +1,1928 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VF分析支援ツール（試作版）</title>
+<style>
+:root{
+  --bg:#eaeff2; --card:#fff; --ink:#1b2a34; --sub:#5b6d7a; --line:#d3dce2;
+  --acc:#0f766e; --acc2:#0b5a54; --accl:#d9f0ed; --warn:#c2410c; --red:#dc2626;
+  --ca:#2563eb; --cb:#ea580c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:"Yu Gothic UI","Meiryo","Hiragino Kaku Gothic ProN",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{height:100vh;min-height:780px;display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-rows:auto minmax(0,1fr)}
+header{grid-column:1/3;display:flex;align-items:center;gap:16px;padding:7px 14px;background:#12333a;color:#fff;flex-wrap:wrap}
+header h1{margin:0;font-size:17px;letter-spacing:.03em}
+header h1 small{font-weight:400;opacity:.7;margin-left:6px;font-size:12px}
+header label{cursor:pointer;margin-right:8px}
+header .grow{flex:1}
+header select{color:var(--ink);background:#fff;border:0;border-radius:6px;padding:3px 6px}
+header .note{font-size:12px;opacity:.75}
+main{display:flex;flex-direction:column;gap:8px;padding:8px;min-width:0;min-height:0;overflow-y:auto}
+.videos{flex:none;height:var(--vh,60vh);min-height:300px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vbox{display:flex;flex-direction:column;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.vhead{display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.chip{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;color:#fff;font-weight:700;font-size:12px}
+.chip.A{background:var(--ca)} .chip.B{background:var(--cb)}
+.lbl{width:110px;border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.fname{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.stage{position:relative;background:#000;flex:1;min-height:0}
+.stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transition:opacity .15s}
+.stage canvas.ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.stage.draw canvas.ov{pointer-events:auto;cursor:crosshair}
+.ph{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#c3d0d8;font-size:15px;line-height:1.8;padding:20px;cursor:pointer}
+.ph:hover{background:rgba(94,234,212,.08)}
+.stage.dragover{outline:3px dashed #5eead4;outline-offset:-6px}
+.badge{position:absolute;left:8px;top:8px;background:rgba(18,51,58,.85);color:#fff;border-radius:6px;padding:3px 8px;font-size:12px;display:none;pointer-events:none}
+.badge.on{display:block}
+.tin{position:absolute;z-index:5;background:#fff;border:2px solid var(--acc);border-radius:6px;padding:3px 6px;min-width:140px}
+.align{display:flex;align-items:center;gap:5px;padding:4px 8px;border-top:1px solid var(--line);font-size:12px;color:var(--sub)}
+.align input[type=range]{flex:1;min-width:60px}
+.align .tm{min-width:104px;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 11px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#f1f6f8}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn.xs{padding:1px 6px;font-size:11px}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.pri:hover{background:var(--acc2)}
+.btn.on{background:var(--accl);border-color:var(--acc);color:var(--acc2);font-weight:700}
+.btn.danger{color:var(--red)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 10px}
+.transport{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.transport .big{font-size:16px;padding:6px 14px;min-width:46px}
+.transport .sep{width:1px;height:26px;background:var(--line);margin:0 6px}
+.transport label{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:4px}
+.transport select,.transport input[type=number]{border:1px solid var(--line);border-radius:6px;padding:4px 5px}
+.transport input[type=number]{width:56px}
+#tcur{font-variant-numeric:tabular-nums;font-size:13px;margin-left:auto;text-align:right;line-height:1.35}
+#tcur b{font-size:15px}
+.tlwrap{padding:4px 6px}
+#tl{display:block;width:100%;height:92px;cursor:pointer;touch-action:none}
+.edit{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+.edit .card{display:flex;flex-direction:column;gap:6px;min-height:0;overflow:hidden}
+.edit h3{margin:0;font-size:13px;color:var(--acc2)}
+.acch{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;padding:2px 0}
+.acch::before{content:'▸';display:inline-block;transition:transform .15s;font-size:12px}
+.acc.open .acch::before{transform:rotate(90deg)}
+.acch:hover{color:var(--acc)}
+.accb{display:none;flex-direction:column;gap:6px;min-height:0}
+.acc.open .accb{display:flex;height:172px}
+.row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.row select,.row input[type=number]{border:1px solid var(--line);border-radius:6px;padding:3px 5px}
+.list{flex:1;min-height:0;overflow:auto;border-top:1px solid var(--line);padding-top:4px;font-size:12.5px}
+.list .it{display:flex;align-items:center;gap:6px;padding:2px 0;border-bottom:1px dashed #e6ecf0}
+.list .it .grow{flex:1}
+.hint{font-size:11.5px;color:var(--sub);line-height:1.5}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
+.sw.on{box-shadow:0 0 0 2px var(--ink)}
+aside{display:flex;flex-direction:column;min-height:0;background:var(--card);border-left:1px solid var(--line)}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;padding:9px 4px;border:0;background:#f3f6f8;cursor:pointer;border-bottom:3px solid transparent;color:var(--sub)}
+.tabs button.on{background:#fff;color:var(--acc2);font-weight:700;border-bottom-color:var(--acc)}
+.tab{display:none;flex:1;min-height:0;overflow:auto;padding:10px 12px}
+.tab.on{display:block}
+.tab h4{margin:12px 0 6px;font-size:13px;color:var(--acc2)}
+.tab h4:first-child{margin-top:0}
+.evgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.evbtn{display:flex;align-items:center;gap:6px;text-align:left;padding:8px 8px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-weight:600}
+.evbtn:hover{background:#f1f6f8}
+.evbtn small{display:block;font-weight:400;color:var(--sub);font-size:11px;line-height:1.35}
+.lp{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--sub)}
+.lp .hint{min-width:96px}
+#expModal,#trkModal{display:none;position:fixed;inset:0;background:rgba(15,23,32,.7);z-index:80;place-items:center}
+#expModal.show,#trkModal.show{display:grid}
+.list .it.sel{background:var(--accl)}
+.list .it{cursor:pointer}
+.sub{margin:6px 0 2px;font-weight:600;font-size:12.5px}
+.expc{background:#fff;border-radius:12px;padding:22px 26px;width:440px;max-width:90vw}
+.expc h3{margin:0 0 8px}
+.bar{height:10px;background:#e3eaee;border-radius:5px;overflow:hidden;margin:10px 0}
+.bar i{display:block;height:100%;background:var(--acc);width:0}
+.help{font-size:11.5px;color:var(--sub);line-height:1.55;margin:4px 0 8px}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th,table.t td{border-bottom:1px solid #e3eaee;padding:3px 4px;text-align:left}
+table.t th{color:var(--sub);font-weight:600;font-size:11.5px}
+.pc{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;color:#fff;font-size:11px;font-weight:700}
+.pc.A{background:var(--ca)} .pc.B{background:var(--cb)}
+.form{display:grid;grid-template-columns:78px 1fr;gap:5px 8px;align-items:center}
+.form input,.form select,.tab textarea,.trial input,.trial select{width:100%;border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:#fff}
+.tab textarea{min-height:90px;resize:vertical}
+.trial{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;background:#fafcfd}
+.trial .tg{display:grid;grid-template-columns:78px 1fr;gap:5px 8px;align-items:center}
+.cap{border:1px solid var(--line);border-radius:8px;padding:6px;margin-bottom:8px}
+.cap img{width:100%;border-radius:4px;display:block;background:#000}
+.cap .row{margin-top:5px}
+.cap input{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+
+#menuBtn{background:transparent;border:1px solid rgba(255,255,255,.55);color:#fff;border-radius:8px;padding:4px 12px;cursor:pointer;font-weight:700}
+#menuBtn:hover{background:rgba(255,255,255,.15)}
+#drawerBg{display:none;position:fixed;inset:0;background:rgba(15,23,32,.45);z-index:70}
+#drawerBg.show{display:block}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(580px,94vw);background:#fff;z-index:71;box-shadow:-8px 0 24px rgba(0,0,0,.25);transform:translateX(105%);transition:transform .22s;display:flex;flex-direction:column}
+#drawer.show{transform:none}
+.dhead{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#12333a;color:#fff}
+.dhead b{font-size:15px;flex:1}
+.dhead .btn{padding:3px 10px;color:var(--ink)}
+.dtabs{display:flex;border-bottom:1px solid var(--line)}
+.dtabs button{flex:1;padding:9px 4px;border:0;background:#f3f6f8;cursor:pointer;border-bottom:3px solid transparent;color:var(--sub)}
+.dtabs button.on{background:#fff;color:var(--acc2);font-weight:700;border-bottom-color:var(--acc)}
+.dbody{flex:1;overflow:auto;padding:14px 18px 30px;line-height:1.7}
+.dsec{display:none}.dsec.on{display:block}
+.dsec h4{margin:16px 0 4px;font-size:14px;color:var(--acc2);border-left:4px solid var(--acc);padding-left:8px}
+.dsec h4:first-child{margin-top:0}
+.dsec ul,.dsec ol{margin:4px 0;padding-left:1.3em}
+.dsec li{margin:3px 0}
+.dsec .callout{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 10px;font-size:12.5px;margin:10px 0}
+.dsec .tip{background:var(--accl);border-radius:8px;padding:8px 10px;font-size:12.5px;margin:10px 0}
+.dsec .row{margin:8px 0}
+#tourBlock{display:none;position:fixed;inset:0;z-index:89}
+#tourHl{display:none;position:fixed;z-index:90;border-radius:10px;box-shadow:0 0 0 9999px rgba(10,20,28,.68);outline:3px solid #5eead4;pointer-events:none;transition:all .25s}
+#tourCard{display:none;position:fixed;z-index:91;width:390px;max-width:92vw;background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 10px 40px rgba(0,0,0,.4);line-height:1.65}
+#tourCard h3{margin:0 0 6px;font-size:16px;color:var(--acc2)}
+#tourCard .tb{font-size:13.5px}
+#tourNav{display:none;position:fixed;top:5px;left:50%;transform:translateX(-50%);z-index:92;width:400px;background:#fff;border-radius:10px;padding:5px 10px;box-shadow:0 4px 18px rgba(0,0,0,.35);align-items:center;gap:6px}
+#tourNav .cnt{font-size:13px;color:var(--sub);flex:1;white-space:nowrap}
+#tourNav .btn{min-width:84px;text-align:center}
+#tourNav #tourSkip{min-width:76px}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#12333a;color:#fff;padding:9px 16px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:100;max-width:80vw}
+#toast.on{opacity:.96}
+#reportOverlay{display:none;position:fixed;inset:0;background:rgba(15,23,32,.78);z-index:60;overflow:auto;padding:18px}
+#reportOverlay.show{display:block}
+.rbar{width:210mm;max-width:100%;margin:0 auto 10px;display:flex;gap:8px;align-items:center;color:#fff}
+.rbar .btn:not(.pri){color:var(--ink)}
+.rpage{background:#fff;color:#000;width:210mm;max-width:100%;margin:0 auto;padding:14mm;min-height:297mm;font-size:12px;line-height:1.55}
+.rpage h1{font-size:19px;margin:0 0 10px;border-bottom:2px solid #0f766e;padding-bottom:5px}
+.rpage h2{font-size:14px;margin:14px 0 5px;color:#0b5a54;border-left:4px solid #0f766e;padding-left:6px}
+.rpage table{width:100%;border-collapse:collapse;margin-bottom:4px}
+.rpage th,.rpage td{border:1px solid #9aa9b3;padding:3px 6px;text-align:left;vertical-align:top}
+.rpage th{background:#eaf2f4;font-weight:600;width:auto}
+.rpage .kv th{width:18%}
+.rpage .figs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rpage figure{margin:0;break-inside:avoid}
+.rpage figure img{width:100%;display:block;border:1px solid #888}
+.rpage figcaption{font-size:11px;margin-top:2px}
+.rpage .foot{margin-top:14px;font-size:10.5px;color:#555;border-top:1px solid #aaa;padding-top:4px}
+@media print{
+  html,body{height:auto;background:#fff}
+  .app,#toast,.rbar{display:none!important}
+  #reportOverlay{position:static;display:block;background:none;padding:0;overflow:visible}
+  .rpage{width:auto;padding:0;min-height:0}
+  @page{size:A4;margin:12mm}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <h1>VF分析支援ツール<small>試作版（第1段階）</small></h1>
+  <div>
+    <label><input type="radio" name="mode" value="normal" checked> 正常例と比べる</label>
+    <label><input type="radio" name="mode" value="prepost"> 前後で比べる</label>
+  </div>
+  <label title="動画を表示する欄の縦の高さ。大きくすると、下の操作部分はスクロールで見えます">動画の高さ
+    <select id="vhSel"><option value="46">標準</option><option value="60" selected>広め</option><option value="74">最大</option></select></label>
+  <div class="grow"></div>
+  <span class="note">評価・教育の補助用です（診断の自動判定は行いません）／通信は一切しません</span>
+  <button id="menuBtn" title="使い方・見るポイント・検査の手順">☰ メニュー</button>
+</header>
+
+<main>
+  <section class="videos" id="videos"></section>
+
+  <section class="card transport">
+    <button class="btn" id="bStart" title="先頭へ（Home）">⏮</button>
+    <button class="btn" data-step="-10" title="10コマ戻る（Shift+←）">◀◀</button>
+    <button class="btn" data-step="-1" title="1コマ戻る（←）">◀</button>
+    <button class="btn pri big" id="bPlay" title="再生／一時停止（スペース）">▶</button>
+    <button class="btn" data-step="1" title="1コマ進む（→）">▶</button>
+    <button class="btn" data-step="10" title="10コマ進む（Shift+→）">▶▶</button>
+    <span class="sep"></span>
+    <label title="スロー区間の外で使う再生速度">通常の速度
+      <select id="baseRate"><option value="1">×1</option><option value="0.75">×0.75</option><option value="0.5">×0.5</option><option value="0.25">×0.25</option><option value="0.1">×0.1</option></select>
+    </label>
+    <label title="動画の1秒あたりのコマ数。コマ送りの幅に使います">コマ数/秒
+      <input type="number" id="fps" value="30" min="1" max="120">
+    </label>
+    <span class="sep"></span>
+    <span class="lp" id="lpBox" title="指定した区間をくり返し再生します">ループ
+      <button class="btn sm" id="lpS" title="今のコマをループの始点にします">始点</button>
+      <button class="btn sm" id="lpE" title="今のコマをループの終点にします">終点</button>
+      <button class="btn sm" id="lpOn">くり返し OFF</button>
+      <button class="btn xs" id="lpClr">解除</button>
+      <span class="hint" id="lpInfo"></span>
+    </span>
+    <span class="sep"></span>
+    <span class="lp" id="trBox" title="長い動画の一部だけを表示して、見やすくします">トリミング
+      <button class="btn sm" id="trS" title="今のコマを表示範囲の始点にします">始点</button>
+      <button class="btn sm" id="trE" title="今のコマを表示範囲の終点にします">終点</button>
+      <button class="btn sm" id="trLp" title="ループの範囲で絞ります">ループ範囲で</button>
+      <button class="btn xs danger" id="trR">リセット</button>
+      <span class="hint" id="trInfo"></span>
+    </span>
+    <div id="tcur"></div>
+  </section>
+
+  <section class="card tlwrap"><canvas id="tl"></canvas></section>
+
+  <section class="edit">
+    <div class="card acc" id="acc1">
+      <h3 class="acch">① スロー再生する区間 <span class="hint" id="accN1"></span></h3>
+      <div class="accb">
+      <div class="row">
+        <button class="btn sm" id="segS" title="ショートカット：[">開始点をここに</button>
+        <button class="btn sm" id="segE" title="ショートカット：]">終了点をここに</button>
+        <select id="segRate"><option value="0.75">×0.75</option><option value="0.5">×0.5</option><option value="0.25" selected>×0.25</option><option value="0.1">×0.1</option></select>
+        <button class="btn sm pri" id="segAdd">区間を追加</button>
+      </div>
+      <div class="hint" id="segDraft">コマを選んで「開始点」「終了点」を押し、区間を追加します。</div>
+      <div class="list" id="segList"></div>
+      </div>
+    </div>
+    <div class="card acc" id="acc2">
+      <h3 class="acch">② 停止演出と書き込み（矢印・コメント・目印） <span class="hint" id="accN2"></span></h3>
+      <div class="accb">
+      <div class="row">
+        <select id="holdDur"><option value="1">1秒</option><option value="3" selected>3秒</option><option value="5">5秒</option></select>
+        <button class="btn sm pri" id="holdAdd" title="今のコマで動画を止める演出を入れます">ここで止める</button>
+        <span style="width:6px"></span>
+        <button class="btn sm tool on" data-tool="none">操作なし</button>
+        <button class="btn sm tool" data-tool="arrow">↗ 矢印</button>
+        <button class="btn sm tool" data-tool="text">Ａ コメント</button>
+        <button class="btn sm tool" data-tool="point">● 目印</button>
+        <select id="lmSel" title="目印につける名前"><option>舌骨</option><option>喉頭</option><option>食塊先端</option><option>下顎</option><option>喉頭蓋</option><option>残留</option></select>
+      </div>
+      <div class="row">
+        <span class="hint">色</span>
+        <button class="sw on" data-color="#ef4444" style="background:#ef4444"></button>
+        <button class="sw" data-color="#facc15" style="background:#facc15"></button>
+        <button class="sw" data-color="#22d3ee" style="background:#22d3ee"></button>
+        <button class="sw" data-color="#ffffff" style="background:#ffffff"></button>
+        <button class="btn xs" id="annUndo">1つ戻す</button>
+        <button class="btn xs danger" id="annClear">書き込みを全部消す</button>
+      </div>
+      <div class="list" id="holdList"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<aside>
+  <div class="tabs">
+    <button class="on" data-tab="tabEv">イベント</button>
+    <button data-tab="tabEval">評価</button>
+    <button data-tab="tabTrk">軌跡・計測</button>
+    <button data-tab="tabOut">画像・出力</button>
+  </div>
+
+  <div class="tab on" id="tabEv">
+    <h4>記録する動画</h4>
+    <div class="row">
+      <label><input type="radio" name="evT" value="A"> <span class="pc A">A</span></label>
+      <label><input type="radio" name="evT" value="B" checked> <span class="pc B">B</span></label>
+      <span class="hint">いま表示しているコマの時刻を記録します</span>
+    </div>
+    <div class="evgrid" id="evBtns" style="margin-top:6px"></div>
+    <h4>記録したイベント</h4>
+    <div id="evList"></div>
+    <h4>イベントの間隔</h4>
+    <div id="evIntv" class="hint">2つ以上記録すると表示されます。</div>
+    <h4>用語の説明</h4>
+    <div class="hint">
+      <b>UES</b>：上部食道括約筋。食道の入口にある筋肉で、飲み込むときに開きます。<br>
+      <b>喉頭侵入</b>：食べ物が喉頭に入るが、声帯より上にとどまる状態。<b>誤嚥</b>：声帯より下（気管）に入る状態。
+    </div>
+    <h4>操作のヒント</h4>
+    <div class="hint">
+      スペース：再生／停止　←→：1コマ　Shift+←→：10コマ　Home：先頭<br>
+      ［ ］：スロー区間の開始／終了　<br>
+      <b>先に「位置合わせ」</b>（各動画の下のバー）で、同じ瞬間（例：嚥下反射の開始）をそろえてから、スロー区間や停止を設定すると、ずれません。
+    </div>
+  </div>
+
+  <div class="tab" id="tabEval">
+    <h4>患者情報</h4>
+    <div class="form" id="patForm">
+      <label>患者ID</label><input data-p="pid">
+      <label>氏名</label><input data-p="name" placeholder="イニシャル可">
+      <label>年齢</label><input data-p="age">
+      <label>性別</label><select data-p="sex"><option></option><option>男性</option><option>女性</option></select>
+      <label>検査日</label><input type="date" data-p="date" id="pDate">
+      <label>検査者</label><input data-p="examiner">
+      <label>検査条件</label><input data-p="cond" placeholder="体位・造影剤など">
+    </div>
+    <h4>食形態ごとの評価</h4>
+    <div class="hint" style="margin-bottom:6px">
+      <b>PAS</b>（Penetration-Aspiration Scale）：食べ物がどこまで気道に入ったかを1〜8で表す尺度。<br>
+      <b>喉頭蓋谷・梨状陥凹</b>：飲み込んだ後に食べ物が残りやすい、のどの2か所のくぼみ。
+    </div>
+    <div id="trials"></div>
+    <button class="btn sm" id="trialAdd">＋ 評価を追加</button>
+    <h4>総合コメント</h4>
+    <textarea id="comment" placeholder="所見・申し送りなど"></textarea>
+  </div>
+
+  <div class="tab" id="tabTrk">
+    <h4>① 追いかける点を決める</h4>
+    <div class="hint">追いたい点（舌骨など）を、動画の上で1回クリックします。そこから前後のコマへ、自動で追いかけます。<br>
+      追う範囲は、トリミング中ならその範囲、そうでなければ動画全体です（先にトリミングすると速く終わります）。</div>
+    <div class="row" style="margin-top:6px">
+      <select id="trkName"><option>舌骨</option><option>喉頭</option><option>食塊先端</option><option>下顎</option><option>喉頭蓋</option><option>その他</option></select>
+      <button class="btn pri tool" data-tool="track">自動で追う（動画上でクリック）</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn pri tool" data-tool="manual" title="自動で追えない画像向けの方法です">手動で追う（クリックで進む）</button>
+      <label class="hint">クリックのたびに <select id="manStep" style="border:1px solid var(--line);border-radius:6px"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select> コマ進む</label>
+    </div>
+    <div class="hint">手動は、自動で追えない画像向けです。クリックした位置の間は、なめらかにつないで補います。速い動きは1〜2コマ、ゆっくりは5コマなど、動きに合わせて変えられます。終わるときは、もう一度ボタンを押すか Esc キー。</div>
+    <div class="form" style="margin-top:8px">
+      <label title="1コマで動く距離の見込み。動きが速い・大きいほど「大」">探す範囲</label>
+      <select id="trkRad"><option value="12">小（ゆっくり）</option><option value="24" selected>中</option><option value="40">大（速い動き）</option></select>
+      <label title="追う点のまわりの、見本にする四角の大きさ">見本の大きさ</label>
+      <select id="trkTs"><option value="21">小</option><option value="33" selected>中</option><option value="49">大</option></select>
+      <label>見本の更新</label><label><input type="checkbox" id="trkUpd" checked style="width:auto"> 形が変わっても追いやすくする</label>
+      <label>顔の向き</label><select id="trkFace"><option value="left" selected>画面の左向き</option><option value="right">画面の右向き</option></select>
+    </div>
+    <h4>② 追っている点</h4>
+    <div class="list" id="trkList" style="max-height:130px;border-top:0"></div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn sm" id="trkPrev">◀ 要確認コマ</button>
+      <button class="btn sm" id="trkNext">要確認コマ ▶</button>
+      <button class="btn sm tool" data-tool="fix" title="選んだ点を、今のコマの正しい位置に直します。そこから先を追い直します">このコマを直す</button>
+    </div>
+    <div class="hint">オレンジの輪や、タイムラインのオレンジの印が「自信が低いコマ」です。ずれていたら、そのコマで「このコマを直す」→ 正しい位置をクリックしてください。</div>
+    <h4>③ 軌跡の見せ方</h4>
+    <div class="row">
+      <label><input type="radio" name="trkStyle" value="dots"> 点</label>
+      <label><input type="radio" name="trkStyle" value="line"> 線</label>
+      <label><input type="radio" name="trkStyle" value="color" checked> 色の変化（青→赤＝時間）</label>
+    </div>
+    <label class="hint" style="display:block;margin-top:4px"><input type="checkbox" id="trkUpTo" checked> 今のコマまでの軌跡だけ表示する</label>
+    <h4>④ 大きさの基準（mmに直すため）</h4>
+    <div class="row"><span class="hint">対象の動画</span>
+      <label><input type="radio" name="scP" value="A"> <span class="pc A">A</span></label>
+      <label><input type="radio" name="scP" value="B" checked> <span class="pc B">B</span></label></div>
+    <div class="form" style="margin-top:6px">
+      <label>基準の種類</label><select id="scMethod"><option value="c24">頸椎 C2〜C4 の長さ</option><option value="custom">実際の長さを入力</option></select>
+      <label id="scSexL">性別の目安</label><select id="scSex"><option value="unk">不明（50mm）</option><option value="M">男性（54mm）</option><option value="F">女性（46mm）</option></select>
+      <label id="scMMl">長さ（mm）</label><input type="number" id="scMM" value="50" min="1" step="0.5">
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn sm tool" data-tool="scale">動画上で2点をクリック</button>
+      <button class="btn xs danger" id="scClr">基準を消す</button>
+    </div>
+    <div class="hint" id="scInfo"></div>
+    <h4>⑤ 計測結果</h4>
+    <div class="row"><button class="btn sm" id="trkRest" title="安静時（動き始める前）のコマで押します。結果は、この位置からの変化量です">いまのコマを安静位置にする</button></div>
+    <div id="trkRes" style="margin-top:6px"></div>
+  </div>
+
+  <div class="tab" id="tabOut">
+    <h4>画像キャプチャ</h4>
+    <div class="row"><button class="btn pri" id="capBtn">いまの画面を撮る</button><span class="hint">左右の動画＋書き込みを1枚にします</span></div>
+    <div id="caps" style="margin-top:8px"></div>
+    <h4>レポート・保存</h4>
+    <div class="row">
+      <button class="btn pri" id="repBtn">レポートを作る（PDF）</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn" id="saveBtn">作業内容を保存（JSON）</button>
+      <button class="btn" id="loadBtn">読み込む</button>
+    </div>
+    <div class="hint" style="margin-top:6px">保存されるのは記録・書き込み・評価です。動画ファイルは含まれません（次回、同じ動画を開いてください）。</div>
+    <h4>編集動画の書き出し</h4>
+    <div class="form">
+      <label>範囲</label><select id="expRange"><option value="all">全体（トリミング中はその範囲）</option><option value="loop">ループ範囲だけ</option></select>
+      <label>表示</label><select id="expLayout"><option value="both">左右に並べる</option><option value="A">Aだけ</option><option value="B">Bだけ</option></select>
+      <label>画質</label><select id="expH"><option value="480">標準（高さ480）</option><option value="720" selected>高画質（720）</option><option value="1080">最高（1080）</option></select>
+      <label>上部の帯</label><label><input type="checkbox" id="expHead" checked style="width:auto"> 名前と時刻を入れる</label>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="btn pri" id="expBtn">動画を書き出す（MP4）</button></div>
+    <div class="help">スロー再生・停止演出・矢印／コメント／目印・左右比較が、そのまま動画に反映されます。<br>
+    動画の長さ（スローや停止の時間も含む）と同じだけ時間がかかります。書き出し中は、他の画面やタブに切り替えないでください。<br>
+    お使いのブラウザがMP4で録画できない場合は、WebM形式で保存されます。</div>
+  </div>
+</aside>
+</div>
+
+<div id="reportOverlay">
+  <div class="rbar">
+    <button class="btn pri" id="repPrint">印刷／PDFで保存</button>
+    <button class="btn" id="repClose">閉じる</button>
+    <span style="font-size:12px;opacity:.85">印刷画面で送信先を「PDFに保存」にするとPDFになります</span>
+  </div>
+  <div class="rpage" id="repBody"></div>
+</div>
+<div id="expModal"><div class="expc"><h3>動画を書き出しています</h3><div id="expMsg"></div><div class="bar"><i id="expBar"></i></div>
+<div class="help">この画面のまま、そのままお待ちください（他のタブや画面に切り替えると中止されます）。</div>
+<button class="btn danger" id="expCancel">中止する</button></div></div>
+<div id="trkModal"><div class="expc"><h3>点を追いかけています</h3><div id="trkMsg"></div><div class="bar"><i id="trkBar"></i></div>
+<div class="help">動画のコマを1枚ずつ調べています。そのままお待ちください。</div>
+<button class="btn danger" id="trkCancel">中止する（ここまでの結果は残ります）</button></div></div>
+<div id="drawerBg"></div>
+<div id="drawer">
+  <div class="dhead"><b>メニュー（VF検査の説明・使い方）</b><button class="btn" id="drClose">閉じる ✕</button></div>
+  <div class="dtabs">
+    <button class="on" data-dt="dt2">見るポイント</button>
+    <button data-dt="dt3">検査の手順</button>
+    <button data-dt="dt4">用語</button>
+    <button data-dt="dt1">使い方・ツアー</button>
+  </div>
+  <div class="dbody">
+
+  <div class="dsec" id="dt1">
+    <div class="row"><button class="btn pri" id="drTour">ガイドツアーをもう一度見る</button></div>
+    <h4>基本の流れ</h4>
+    <ol>
+      <li><b>動画を開く</b>：左（A）・右（B）の表示欄をクリックして、動画を選びます。「正常例と比べる」か「前後で比べる」は、画面上部で切り替えます。</li>
+      <li><b>位置合わせ</b>：各動画の下のバーで、同じ瞬間（例：嚥下反射が始まる瞬間）をそろえます。<u>先に</u>行うと、あとの設定がずれません。</li>
+      <li><b>見る</b>：再生・コマ送り（← →キー）・速度変更。ループで同じ場面をくり返し、トリミングで長い動画の一部だけを大きく表示できます。</li>
+      <li><b>スロー区間</b>：始点と終点を決めて、その区間だけ ×0.75〜×0.1 でゆっくり再生します。</li>
+      <li><b>記録する</b>：イベント（嚥下反射開始・喉頭閉鎖など）のボタンで、その瞬間の時刻を記録します。「評価」タブでPAS・残留・コメントを入力します。</li>
+      <li><b>見せる</b>：「停止演出」で、指定コマで1・3・5秒止めて、矢印・コメント・目印を書き込めます。画像キャプチャも撮れます。</li>
+      <li><b>計測する</b>：「軌跡・計測」タブで、舌骨などの動きを追い、頸椎（C2〜C4）を基準にmmや%に直します。</li>
+      <li><b>出力・保存</b>：編集動画の書き出し、PDFレポート、作業内容の保存（JSON）ができます。</li>
+    </ol>
+    <h4>キーボード</h4>
+    <ul><li>スペース：再生／一時停止　／　← →：1コマ　／　Shift＋← →：10コマ　／　Home：先頭へ</li>
+    <li>［ ］：スロー区間の始点／終点　／　Esc：書き込みや手動追跡などの終了</li></ul>
+    <h4>こんなときは</h4>
+    <ul>
+      <li><b>動画が再生できない</b>：H.264のMP4かWebMでお試しください。</li>
+      <li><b>画面が見切れる</b>：上部の「動画の高さ」を「標準」にし、下の編集欄は折りたたんでおけます。</li>
+      <li><b>前回の続きをしたい</b>：「画像・出力」タブの「作業内容を保存／読み込む」を使います（動画ファイルは含まれません）。</li>
+      <li><b>正常例を毎回使う</b>：動画Aを開いて「正常例として登録」を押すと、次回から自動で読み込まれます。</li>
+    </ul>
+  </div>
+
+  <div class="dsec on" id="dt2">
+    <div class="callout">一般的な観察の観点をまとめたものです。判断の基準や手順は、施設のプロトコルや成書・ガイドラインに従ってください。</div>
+    <h4>① 口の中（準備期・口腔期）</h4>
+    <ul>
+      <li>口唇からのこぼれ、食べ物をまとめる動き（食塊形成）</li>
+      <li>舌が食塊を奥へ送り込む動き（左右差・不十分さ）</li>
+      <li>口の中に残る量（舌の上・口腔底・頬と歯ぐきの間）</li>
+      <li>嚥下の前に、食べ物が咽頭へ流れ込んでいないか（早期咽頭流入）</li>
+    </ul>
+    <h4>② のど（咽頭期）</h4>
+    <ul>
+      <li><b>嚥下反射のタイミング</b>：食塊の先端がどこまで来たときに反射が始まるか。遅れていないか。</li>
+      <li><b>鼻への逆流</b>：軟口蓋（上あご奥）が挙がって、鼻への通り道が閉じているか。</li>
+      <li><b>舌根の後ろへの動きと咽頭の収縮</b>：食塊を押し出す力は十分か。</li>
+      <li><b>舌骨・喉頭の挙上と前方への動き</b>：十分に上がるか（軌跡・計測で数値化できます）。</li>
+      <li><b>喉頭閉鎖</b>：喉頭蓋が倒れ、気管の入口が閉じるか。閉じるタイミングは適切か。</li>
+      <li><b>UES（食道入口部）の開き</b>：開く大きさ、開いている時間、食塊がスムーズに通るか。</li>
+      <li><b>残留</b>：嚥下後に喉頭蓋谷・梨状陥凹に残る量。何回かの嚥下で減るか。</li>
+    </ul>
+    <h4>③ 気道を守れているか</h4>
+    <ul>
+      <li><b>喉頭侵入／誤嚥</b>：食べ物がどこまで入ったか（声帯より上か、下か）。</li>
+      <li><b>いつ起きたか</b>：嚥下の前・最中・後のどれか。原因の推測の手がかりになります。</li>
+      <li><b>むせの有無</b>：むせないまま誤嚥する場合（不顕性誤嚥）があるため、画像で確認します。</li>
+      <li><b>排出できるか</b>：入った食べ物を、咳などで出せるか。→ <b>PAS</b>（1〜8）で記録します。</li>
+    </ul>
+    <h4>④ 食道（食道期）</h4>
+    <ul><li>食道の通過、逆流（検査の範囲や施設の方針に従います）</li></ul>
+    <h4>⑤ 比べて見るとき</h4>
+    <ul>
+      <li>正常例と比べて、どの動き・どのタイミングが違うか（このツールの左右比較）</li>
+      <li>姿勢・食形態・嚥下の工夫（手技）で、前後にどう変わるか（前後比較）</li>
+      <li>スローやコマ送りで、「いつ・どこで」起きたかを特定してから、評価やPASに入力します</li>
+    </ul>
+  </div>
+
+  <div class="dsec" id="dt3">
+    <div class="callout">一般的な流れの例です。安全面の基準・食べ物の種類や量・中止の基準・被曝の管理などは、必ず施設のプロトコルと担当医の指示に従ってください。</div>
+    <h4>1. 検査の前</h4>
+    <ul>
+      <li>目的の確認（何を知りたい検査か）と、これまでの経過・全身状態・リスクの確認</li>
+      <li>本人・家族への説明と同意</li>
+      <li>吸引など、緊急時の準備と、スタッフの役割分担</li>
+    </ul>
+    <h4>2. 準備</h4>
+    <ul>
+      <li>造影剤を混ぜた検査食（水分・とろみ・ゼリー・ペースト・固形など）を、目的に応じて用意</li>
+      <li>姿勢（座位・リクライニング）、頭頸部の位置、撮影の向き（側面を基本に、必要に応じて正面）</li>
+      <li>撮影範囲は、口唇から頸部食道まで。録画前に、患者ID・日付などを記録</li>
+    </ul>
+    <h4>3. 検査中</h4>
+    <ul>
+      <li>少量から始め、安全を確認しながら進める</li>
+      <li>各食形態で、必要に応じて複数回観察する</li>
+      <li>誤嚥があった場合は、むせ・咳の様子や排出できるかも見ておく</li>
+    </ul>
+    <h4>4. 対策を試す（同じ検査の中で）</h4>
+    <ul>
+      <li>姿勢の調整（リクライニング角度、頸部の向きなど）</li>
+      <li>食形態や量の調整</li>
+      <li>嚥下の工夫（複数回嚥下、交互嚥下、息こらえ嚥下など）</li>
+      <li>工夫の前後を、このツールの「前後で比べる」で並べて確認できます</li>
+    </ul>
+    <h4>5. 検査のあと</h4>
+    <ul>
+      <li>口や咽頭に残った造影剤の確認と除去、体調の観察</li>
+      <li>結果の共有と、食事内容・姿勢・介助方法の提案</li>
+    </ul>
+    <h4>6. このツールでの記録の流れ</h4>
+    <ol>
+      <li>検査動画を開き、必要なら正常例と並べる</li>
+      <li>イベントを記録（嚥下反射開始・喉頭閉鎖・UES開大・誤嚥など）</li>
+      <li>「評価」タブで、食形態ごとにPAS・残留を入力し、総合コメントを書く</li>
+      <li>説明に使う場面は、停止演出・書き込み・キャプチャで整える</li>
+      <li>レポート（PDF）と作業内容の保存</li>
+    </ol>
+  </div>
+
+  <div class="dsec" id="dt4">
+    <h4>PAS（Penetration-Aspiration Scale）</h4>
+    <p>食べ物がどこまで気道に入ったか、それを出せたかを1〜8で表す尺度。1は侵入なし、8は声帯より下に入り、出す努力もない状態。</p>
+    <h4>喉頭侵入／誤嚥</h4>
+    <p>喉頭侵入：食べ物が喉頭に入るが、声帯より上にとどまる。誤嚥：声帯より下（気管）に入る。</p>
+    <h4>不顕性誤嚥</h4>
+    <p>誤嚥しても、むせなどの反応が出ない状態。</p>
+    <h4>UES（上部食道括約筋）</h4>
+    <p>食道の入口にある筋肉。ふだんは閉じていて、飲み込むときに開きます。</p>
+    <h4>喉頭蓋谷（こうとうがいこく）</h4>
+    <p>舌の付け根と喉頭蓋の間にあるくぼみ。食べ物が残りやすい場所。</p>
+    <h4>梨状陥凹（りじょうかんおう）</h4>
+    <p>喉頭の左右にあるくぼみ。食べ物が残りやすい場所。</p>
+    <h4>舌骨</h4>
+    <p>あごの下にある小さな骨。飲み込むとき、上前方へ動いて喉頭を引き上げます。</p>
+    <h4>C2–C4</h4>
+    <p>首の骨（頸椎）の2番目から4番目。この長さを「ものさし」にして、動きを体格の差に左右されにくい形で表します。</p>
+    <h4>嚥下反射の惹起</h4>
+    <p>飲み込みの反射が始まること。食べ物がのどのどの位置まで来たときに始まるかを見ます。</p>
+  </div>
+
+  </div>
+</div>
+
+<div id="tourBlock"></div>
+<div id="tourHl"></div>
+<div id="tourCard"><h3 id="tourT"></h3><div class="tb" id="tourB"></div>
+</div>
+<div id="tourNav"><span class="cnt" id="tourC"></span>
+  <button class="btn sm" id="tourSkip">スキップ</button><button class="btn sm" id="tourPrev">◀ 前へ</button><button class="btn sm pri" id="tourNext">次へ ▶</button></div>
+<div id="toast"></div>
+<input type="file" id="fileIn" accept="video/*,.mp4,.webm,.mov" hidden>
+<input type="file" id="projIn" accept=".json,application/json" hidden>
+
+<script>
+'use strict';
+/* ========== 基本ヘルパー ========== */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+let _n=0; const uid=()=>'i'+(++_n)+Math.random().toString(36).slice(2,6);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toast._h);toast._h=setTimeout(()=>t.classList.remove('on'),ms);}
+
+const EVENTS=[
+  {n:'口腔送り込み',s:'送',c:'#2563eb',h:'口の中で食べ物を奥へ送り始める'},
+  {n:'嚥下反射開始',s:'反',c:'#0f766e',h:'飲み込みの反射が始まる瞬間'},
+  {n:'喉頭閉鎖',s:'閉',c:'#7c3aed',h:'気管の入口が閉じる'},
+  {n:'UES開大',s:'開',c:'#d97706',h:'UES（上部食道括約筋）＝食道の入口が開く'},
+  {n:'誤嚥',s:'誤',c:'#dc2626',h:'食べ物が声帯より下（気管）に入る'},
+  {n:'喉頭侵入',s:'侵',c:'#db2777',h:'食べ物が喉頭に入るが、声帯より上にとどまる'}
+];
+const PAS=[
+  '',
+  '1：喉頭侵入も誤嚥もなし',
+  '2：喉頭侵入あり。声帯に達せず、喉頭から排出される',
+  '3：喉頭侵入あり。声帯に達せず、排出されない',
+  '4：声帯に達するが、排出される',
+  '5：声帯に達し、排出されない',
+  '6：声帯より下に入り（誤嚥）、排出される',
+  '7：声帯より下に入り、排出の努力はあるが排出されない',
+  '8：声帯より下に入り、排出の努力もない（むせなし）'
+];
+const RES=['','なし','少量','中等量','多量'];
+
+/* ========== 状態 ========== */
+const mkV=(label)=>({el:null,file:null,name:'',url:null,loaded:false,dur:0,w:0,h:0,off:0,label});
+const S={
+  fps:30, mode:'normal', baseRate:1,
+  vids:{A:mkV('正常例'),B:mkV('当日検査')},
+  t:0, playing:false, lastTs:0, holding:null, passed:new Set(),
+  segs:[], holds:[], events:[], trials:[], caps:[],
+  patient:{}, comment:'',
+  segDraft:{s:null,e:null}, loop:{s:null,e:null,on:false}, exporting:false, exp:null,
+  trim:{s:null,e:null,on:false},
+  tracks:[], trackSel:null, trackStyle:'color', trackUpTo:true, trackCfg:{rad:24,ts:33,upd:true,face:'left'}, tracking:false, trkCancel:false, manualTrack:null, flash:null,
+  scale:{A:{p1:null,p2:null,method:'c24',mm:50,sex:'unk'},B:{p1:null,p2:null,method:'c24',mm:50,sex:'unk'}}, scPanel:'B', scaleDraft:null, tool:'none', color:'#ef4444', evTarget:'B', drag:null, tlDrag:false
+};
+
+/* ========== 時間の計算 ========== */
+const loadedIds=()=>['A','B'].filter(i=>S.vids[i].loaded);
+function fullRange(){
+  const ids=loadedIds(); if(!ids.length) return [0,0];
+  let a=Infinity,b=-Infinity;
+  for(const i of ids){const V=S.vids[i]; a=Math.min(a,-V.off)||0; b=Math.max(b,V.dur-V.off);}
+  return [a,b];
+}
+function tRange(){
+  const [a,b]=fullRange(), T=S.trim;
+  if(T.on&&T.s!=null&&T.e!=null&&T.e>T.s){
+    const aa=Math.max(a,T.s), bb=Math.min(b,T.e+1/S.fps);
+    if(bb>aa) return [aa,bb];
+  }
+  return [a,b];
+}
+function tLast(){const [a,b]=tRange(); return Math.max(a,b-1/S.fps);}
+const fq=x=>Math.floor(x*S.fps+1e-4)/S.fps;           // コマの先頭に丸める
+const frameOf=x=>Math.floor(x*S.fps+1e-4);
+const inRange=(id,tt)=>{const V=S.vids[id]; const x=tt+V.off; return V.loaded && x>=-1e-6 && x<V.dur-1e-6;};
+function vtOf(id){const V=S.vids[id]; return fq(clamp(S.t+V.off,0,Math.max(0,V.dur-1/S.fps)));}
+function setVideoTime(id,time){
+  const V=S.vids[id]; if(!V.loaded) return;
+  const last=Math.max(0,Math.ceil(V.dur*S.fps-1e-4)-1);
+  const idx=clamp(Math.floor(time*S.fps+1e-4),0,last);
+  const target=(idx+0.5)/S.fps;
+  if(Math.abs(V.el.currentTime-target)>1e-4) V.el.currentTime=target;
+}
+function seekAll(t){
+  const [a]=tRange();
+  S.t=clamp(Math.round(t*S.fps)/S.fps,a,tLast());
+  for(const id of loadedIds()) setVideoTime(id,S.t+S.vids[id].off);
+}
+const fmt=x=>x.toFixed(2)+'秒';
+
+/* ========== 再生制御 ========== */
+function rateAt(t){const g=S.segs.find(s=>t>=s.s-1e-6&&t<s.e-1e-6); return g?g.rate:S.baseRate;}
+function play(){
+  if(!loadedIds().length){toast('先に動画を開いてください');return;}
+  if(S.playing) return;
+  if(S.t>=tLast()-1e-6) seekAll(tRange()[0]);
+  if(loopOK() && !S.exporting && S.t>=S.loop.e-1e-6) seekAll(S.loop.s);
+  S.playing=true; S.holding=null; S.lastTs=0;
+  S.passed=new Set(S.holds.filter(h=>S.exporting?h.t<S.t-1e-6:h.t<=S.t+0.5/S.fps).map(h=>h.id));
+  startVideos(rateAt(S.t));
+  $('#bPlay').textContent='⏸';
+  requestAnimationFrame(loop);
+}
+const loopOK=()=>S.loop.on&&S.loop.s!=null&&S.loop.e!=null&&S.loop.e>S.loop.s;
+function startVideos(rate){
+  for(const id of loadedIds()){
+    const V=S.vids[id];
+    if(inRange(id,S.t)){ setVideoTime(id,S.t+V.off); V.el.playbackRate=rate; V.el.play().catch(()=>{}); }
+  }
+}
+function pause(){
+  if(!S.playing && !S.holding){return;}
+  let nt=S.t;
+  if(S.playing && !S.holding){
+    const m=pickMaster(); if(m) nt=fq(S.vids[m].el.currentTime-S.vids[m].off);
+  }
+  S.playing=false; S.holding=null;
+  for(const id of loadedIds()) S.vids[id].el.pause();
+  $('#bPlay').textContent='▶';
+  seekAll(nt); uiTick();
+}
+function pickMaster(){
+  for(const id of loadedIds()){
+    const V=S.vids[id], el=V.el;
+    if(!el.paused && !el.ended && el.currentTime-V.off>=-1e-6 && el.currentTime<V.dur) return id;
+  }
+  return null;
+}
+function loop(ts){
+  if(!S.playing) return;
+  const dt=S.lastTs?(ts-S.lastTs)/1000:0; S.lastTs=ts;
+  if(S.holding){
+    if(ts>=S.holding.until){ S.holding=null; startVideos(rateAt(S.t)); }
+    uiTick(); requestAnimationFrame(loop); return;
+  }
+  const prev=S.t;
+  const m=pickMaster();
+  const rate=rateAt(prev);
+  let nt;
+  if(m) nt=S.vids[m].el.currentTime-S.vids[m].off;
+  else  nt=prev+dt*rate;
+  // ループ
+  if(loopOK() && !S.exporting && prev<S.loop.e-1e-6 && nt>=S.loop.e-1e-6){
+    seekAll(S.loop.s);
+    S.passed=new Set(S.holds.filter(h=>h.t<=S.loop.s+0.5/S.fps).map(h=>h.id));
+    startVideos(rateAt(S.t));
+    uiTick(); requestAnimationFrame(loop); return;
+  }
+  // 停止演出
+  for(const h of S.holds){
+    if(!S.passed.has(h.id) && prev<h.t-1e-6 && nt>=h.t-1e-6){
+      S.passed.add(h.id);
+      for(const id of loadedIds()) S.vids[id].el.pause();
+      seekAll(h.t);
+      S.holding={until:ts+h.dur*1000,h};
+      uiTick(); requestAnimationFrame(loop); return;
+    }
+  }
+  if(S.exporting && S.exp && nt>=S.exp.t1-1e-6){ finishExport(true); return; }
+  S.t=nt;
+  // 各動画の調整
+  const r2=rateAt(nt);
+  for(const id of loadedIds()){
+    const V=S.vids[id], el=V.el, target=nt+V.off;
+    if(target>=0 && target<V.dur-1/S.fps*0.5){
+      if(el.paused && !el.ended){ setVideoTime(id,target); el.playbackRate=r2; el.play().catch(()=>{}); }
+      else{
+        if(el.playbackRate!==r2) el.playbackRate=r2;
+        if(id!==m && Math.abs(el.currentTime-target)>0.05) el.currentTime=target;
+      }
+    }else if(!el.paused){ el.pause(); }
+  }
+  if(nt>=tLast()+0.5/S.fps){ // 終了
+    if(S.exporting){ finishExport(true); return; }
+    S.playing=false; $('#bPlay').textContent='▶';
+    for(const id of loadedIds()) S.vids[id].el.pause();
+    seekAll(tLast());
+  }
+  uiTick();
+  if(S.playing) requestAnimationFrame(loop);
+}
+function step(n){
+  if(!loadedIds().length) return;
+  if(S.playing||S.holding) pause();
+  seekAll(S.t+n/S.fps); uiTick();
+}
+
+/* ========== 描画（書き込み） ========== */
+function contentRect(id){
+  const st=$('#stage'+id), W=st.clientWidth, H=st.clientHeight, V=S.vids[id];
+  if(!V.w) return {x:0,y:0,w:W,h:H};
+  const sc=Math.min(W/V.w,H/V.h), w=V.w*sc, h=V.h*sc;
+  return {x:(W-w)/2,y:(H-h)/2,w,h};
+}
+function drawAnn(g,r,a){
+  const lw=Math.max(2.5,r.h/150), X=v=>r.x+v*r.w, Y=v=>r.y+v*r.h;
+  g.lineWidth=lw; g.lineCap='round'; g.strokeStyle=a.color; g.fillStyle=a.color;
+  if(a.type==='arrow'){
+    const x1=X(a.x),y1=Y(a.y),x2=X(a.x2),y2=Y(a.y2), ang=Math.atan2(y2-y1,x2-x1), hl=lw*4+9;
+    g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2-Math.cos(ang)*hl*0.6,y2-Math.sin(ang)*hl*0.6); g.stroke();
+    g.beginPath(); g.moveTo(x2,y2);
+    g.lineTo(x2-hl*Math.cos(ang-0.42),y2-hl*Math.sin(ang-0.42));
+    g.lineTo(x2-hl*Math.cos(ang+0.42),y2-hl*Math.sin(ang+0.42)); g.closePath(); g.fill();
+  }else if(a.type==='point'){
+    const x=X(a.x),y=Y(a.y),rr=lw*2.4;
+    g.beginPath(); g.arc(x,y,rr,0,7); g.fill();
+    g.beginPath(); g.arc(x,y,rr*2,0,7); g.stroke();
+    if(a.label){
+      const fs=Math.max(13,r.h/26); g.font=`700 ${fs}px "Yu Gothic UI",Meiryo,sans-serif`; g.textBaseline='middle';
+      const tx=x+rr*2.6, w=g.measureText(a.label).width;
+      g.fillStyle='rgba(0,0,0,.6)'; g.fillRect(tx-4,y-fs*0.7,w+8,fs*1.4);
+      g.fillStyle=a.color; g.fillText(a.label,tx,y);
+    }
+  }else if(a.type==='text'){
+    const fs=Math.max(14,r.h/22); g.font=`700 ${fs}px "Yu Gothic UI",Meiryo,sans-serif`; g.textBaseline='top';
+    const x=X(a.x), y=Y(a.y), w=g.measureText(a.text).width;
+    g.fillStyle='rgba(0,0,0,.62)'; g.fillRect(x-5,y-3,w+10,fs*1.3);
+    g.fillStyle=a.color; g.fillText(a.text,x,y);
+  }
+}
+function activeHold(){
+  if(S.holding) return S.holding.h;
+  return S.holds.find(h=>Math.abs(h.t-S.t)<=0.5/S.fps+1e-6)||null;
+}
+function drawOverlays(){
+  const dpr=window.devicePixelRatio||1, ah=activeHold();
+  for(const id of ['A','B']){
+    const c=$('#ov'+id), W=c.clientWidth, H=c.clientHeight;
+    if(c.width!==Math.round(W*dpr)||c.height!==Math.round(H*dpr)){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);}
+    const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+    if(!S.vids[id].loaded) continue;
+    const r=contentRect(id);
+    if(ah) for(const a of ah.ann) if(a.panel===id) drawAnn(g,r,a);
+    drawScaleLine(g,r,id); drawTracks(g,r,id,panelFrame(id));
+    if(S.flash&&S.flash.panel===id){
+      const a=1-(performance.now()-S.flash.t0)/700;
+      if(a>0){ const x=r.x+S.flash.x*r.w, y=r.y+S.flash.y*r.h, rr=Math.max(8,r.h/60);
+        g.globalAlpha=a; g.strokeStyle='#fff'; g.lineWidth=3.5; g.beginPath(); g.arc(x,y,rr,0,7); g.stroke();
+        g.strokeStyle=S.flash.color; g.lineWidth=2; g.beginPath(); g.arc(x,y,rr,0,7); g.stroke(); g.globalAlpha=1; }
+    }
+    if(S.drag && S.drag.panel===id) drawAnn(g,r,S.drag.a);
+  }
+}
+
+/* ========== タイムライン ========== */
+function drawTL(){
+  const c=$('#tl'), dpr=window.devicePixelRatio||1, W=c.clientWidth, H=c.clientHeight;
+  if(c.width!==Math.round(W*dpr)||c.height!==Math.round(H*dpr)){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr);}
+  const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  const [a,b]=tRange(), pad=16, span=Math.max(b-a,1e-6), X=t=>pad+(t-a)/span*(W-2*pad);
+  g.font='11px "Yu Gothic UI",Meiryo,sans-serif'; g.textBaseline='middle';
+  if(!loadedIds().length){g.fillStyle='#8a9aa6';g.fillText('動画を開くと、ここにタイムラインが表示されます',pad,H/2);return;}
+  // 目盛り
+  const steps=[0.1,0.2,0.5,1,2,5,10,30,60]; let st=steps.find(s=>s/span*(W-2*pad)>=56)||60;
+  g.fillStyle='#5b6d7a'; g.strokeStyle='#cfd9df'; g.lineWidth=1;
+  for(let t=Math.ceil(a/st)*st;t<=b+1e-9;t+=st){const x=Math.round(X(t))+0.5; g.beginPath();g.moveTo(x,12);g.lineTo(x,18);g.stroke(); g.fillText(t.toFixed(st<1?1:0)+'s',x+3,7);}
+  // ループ範囲
+  if(S.loop.s!=null||S.loop.e!=null){
+    g.fillStyle=S.loop.on?'rgba(22,163,74,.13)':'rgba(120,120,120,.08)';
+    if(S.loop.s!=null&&S.loop.e!=null&&S.loop.e>S.loop.s) g.fillRect(X(S.loop.s),14,X(S.loop.e)-X(S.loop.s),H-16);
+    g.strokeStyle=S.loop.on?'#16a34a':'#8a9aa6'; g.lineWidth=2;
+    for(const v of [S.loop.s,S.loop.e]) if(v!=null){const x=X(v);g.beginPath();g.moveTo(x,14);g.lineTo(x,H-2);g.stroke();}
+    g.lineWidth=1;
+  }
+  // 動画の範囲
+  const rows={A:{y:50,c:'#dbeafe'},B:{y:66,c:'#ffedd5'}};
+  for(const id of loadedIds()){const V=S.vids[id]; g.fillStyle=rows[id].c; g.fillRect(X(-V.off),rows[id].y-6,X(V.dur-V.off)-X(-V.off),12); g.fillStyle='#5b6d7a'; g.fillText(id,3,rows[id].y);}
+  // スロー区間
+  for(const s of S.segs){const x1=X(s.s),x2=X(s.e); g.fillStyle='rgba(234,88,12,.28)'; g.fillRect(x1,20,x2-x1,12); g.fillStyle='#9a3412'; g.fillText('×'+s.rate,x1+3,26);}
+  if(S.segDraft.s!=null){g.strokeStyle='#ea580c';g.setLineDash([4,3]);const x=X(S.segDraft.s);g.beginPath();g.moveTo(x,18);g.lineTo(x,H-4);g.stroke();g.setLineDash([]);}
+  if(S.segDraft.e!=null){g.strokeStyle='#ea580c';g.setLineDash([4,3]);const x=X(S.segDraft.e);g.beginPath();g.moveTo(x,18);g.lineTo(x,H-4);g.stroke();g.setLineDash([]);}
+  // 停止演出
+  for(const h of S.holds){const x=X(h.t); g.fillStyle='#1d4ed8'; g.fillRect(x-2,34,4,12); g.fillStyle='#fff'; g.fillRect(x-1,37,1,6);g.fillRect(x+1,37,1,6); g.fillStyle='#1d4ed8'; g.fillText(h.dur+'s',x+5,40);}
+  // イベント
+  for(const e of S.events){
+    const V=S.vids[e.panel]; const ev=EVENTS.find(q=>q.n===e.label); if(!ev) continue;
+    const x=X(e.vt-V.off), y=rows[e.panel].y;
+    g.fillStyle=ev.c; g.beginPath(); g.arc(x,y,7,0,7); g.fill();
+    g.fillStyle='#fff'; g.font='bold 10px "Yu Gothic UI",Meiryo,sans-serif'; g.textAlign='center'; g.fillText(ev.s,x,y+0.5); g.textAlign='left'; g.font='11px "Yu Gothic UI",Meiryo,sans-serif';
+  }
+  // 要確認コマ・トリミング表示
+  const stk=S.tracks.find(t=>t.id===S.trackSel);
+  if(stk&&S.vids[stk.panel].loaded){
+    g.fillStyle='#f97316';
+    for(const k of trackKeys(stk)){ const q=stk.pts[k]; if(q[2]<0.5&&!q[3]){ const x=X(k/S.fps-S.vids[stk.panel].off); g.fillRect(x-1,rows[stk.panel].y+8,2,5);} }
+  }
+  if(S.trim.on&&S.trim.s!=null&&S.trim.e!=null){ g.fillStyle='#c2410c'; g.textAlign='right'; g.font='bold 11px "Yu Gothic UI",Meiryo,sans-serif'; g.fillText('トリミング中（リセットで全体に戻ります）',W-pad,26); g.textAlign='left'; }
+  // 再生位置
+  const px=X(S.t); g.strokeStyle='#dc2626'; g.lineWidth=2; g.beginPath(); g.moveTo(px,14); g.lineTo(px,H-2); g.stroke();
+  g.fillStyle='#dc2626'; g.beginPath(); g.moveTo(px-5,12); g.lineTo(px+5,12); g.lineTo(px,19); g.closePath(); g.fill();
+}
+function tlSeek(e){
+  const c=$('#tl'), r=c.getBoundingClientRect(), [a,b]=tRange(), pad=16;
+  if(!loadedIds().length) return;
+  seekAll(a+(e.clientX-r.left-pad)/(r.width-2*pad)*(b-a)); uiTick();
+}
+
+/* ========== 画面更新 ========== */
+function uiTick(){
+  const ids=loadedIds();
+  let html=`共通時間 <b>${S.t.toFixed(2)}</b> 秒`;
+  for(const id of ['A','B']){
+    const V=S.vids[id]; const tm=$('#tm'+id), al=$('#al'+id);
+    if(V.loaded){
+      const live=(S.playing&&!S.holding&&!V.el.paused)?V.el.currentTime:null;
+      const vt=live!=null?live:vtOf(id);
+      tm.textContent=`${vt.toFixed(2)}s F${frameOf(vt)}`;
+      al.max=Math.max(0.001,V.dur-1/S.fps).toFixed(3);
+      if(document.activeElement!==al) al.value=clamp(vt,0,V.dur);
+      V.el.style.opacity=inRange(id,S.t)?1:0.3;
+      html+=`<br><span class="pc ${id}">${id}</span> ${vt.toFixed(2)}秒 ／ ${frameOf(vt)}コマ目`;
+      if(id==='B'||!S.vids.B.loaded) {}
+    }else{tm.textContent='—';}
+    const bd=$('#bd'+id);
+    if(S.holding){bd.className='badge on'; bd.textContent=`⏸ 停止演出 あと${Math.max(0,(S.holding.until-performance.now())/1000).toFixed(1)}秒`;}
+    else{const h=activeHold(); if(h){bd.className='badge on';bd.textContent=`停止演出 ${h.dur}秒（書き込みできます）`;}else bd.className='badge';}
+  }
+  if(!ids.length) html='動画を開いてください';
+  $('#tcur').innerHTML=html;
+  drawTL(); drawOverlays();
+}
+
+/* ========== 動画の読み込み ========== */
+function loadVideo(id,file,opts={}){
+  const V=S.vids[id];
+  const same=V.name===file.name;
+  if(!opts.restore && !same && S.events.some(e=>e.panel===id)){
+    if(!confirm('この動画に記録したイベントを消して、新しい動画を開きますか？')) return;
+    S.events=S.events.filter(e=>e.panel!==id);
+  }
+  if(S.playing||S.holding) pause();
+  if(V.url) URL.revokeObjectURL(V.url);
+  V.file=file; V.name=file.name; V.loaded=false; V.url=URL.createObjectURL(file);
+  if(!same && !opts.restore) V.off=0;
+  V.el.onloadedmetadata=()=>{
+    const el=V.el;
+    const fin=()=>{
+      V.dur=el.duration; V.w=el.videoWidth; V.h=el.videoHeight; V.loaded=true;
+      $('#ph'+id).style.display='none';
+      seekAll(S.t); renderAll();
+    };
+    if(!isFinite(el.duration)){   // ブラウザ録画のWebMは長さが不明になるため、最後まで一度飛んで長さを確定させる
+      const h=()=>{el.removeEventListener('timeupdate',h); el.currentTime=0; fin();};
+      el.addEventListener('timeupdate',h); el.currentTime=1e101;
+    }else fin();
+  };
+  V.el.onerror=()=>{V.loaded=false; toast('この動画は再生できません。H.264のMP4またはWebMでお試しください',4500);};
+  V.el.src=V.url; V.el.load();
+  $('#fname'+id).textContent=file.name; $('#fname'+id).title=file.name;
+}
+let pickTarget='A';
+function openPicker(id){pickTarget=id; $('#fileIn').value=''; $('#fileIn').click();}
+
+/* 正常例の登録（ブラウザ内の保存領域：IndexedDB） */
+const IDB={
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open('vf-support',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});},
+  async get(k){const db=await this.open();return new Promise((res,rej)=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});},
+  async set(k,v){const db=await this.open();return new Promise((res,rej)=>{const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});},
+  async del(k){const db=await this.open();return new Promise((res,rej)=>{const tx=db.transaction('kv','readwrite');tx.objectStore('kv').delete(k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});}
+};
+async function registerNormal(){
+  const V=S.vids.A; if(!V.file){toast('動画Aを開いてから登録してください');return;}
+  try{
+    await IDB.set('normal',{name:V.name,blob:V.file,off:V.off,events:S.events.filter(e=>e.panel==='A').map(e=>({label:e.label,vt:e.vt})),label:V.label});
+    toast('正常例として登録しました。次回から自動で読み込まれます');
+  }catch(err){toast('登録できませんでした（ブラウザの保存領域が使えません）',4000);}
+}
+async function unregisterNormal(){
+  try{await IDB.del('normal');toast('正常例の登録を解除しました');}catch(e){toast('解除できませんでした');}
+}
+async function restoreNormal(){
+  try{
+    const rec=await IDB.get('normal'); if(!rec||!rec.blob) return;
+    const f=new File([rec.blob],rec.name,{type:rec.blob.type||'video/mp4'});
+    S.vids.A.off=rec.off||0; if(rec.label){S.vids.A.label=rec.label;$('#lblA').value=rec.label;}
+    S.events=S.events.filter(e=>e.panel!=='A');
+    (rec.events||[]).forEach(e=>S.events.push({id:uid(),panel:'A',label:e.label,vt:e.vt}));
+    loadVideo('A',f,{restore:true});
+    toast('登録済みの正常例を読み込みました');
+  }catch(e){/* 保存領域が使えない環境では何もしない */}
+}
+
+/* ========== 画面の組み立て ========== */
+function makeBox(id){
+  return `<div class="vbox">
+  <div class="vhead">
+    <span class="chip ${id}">${id}</span>
+    <input class="lbl" id="lbl${id}" title="この動画の呼び名">
+    <button class="btn sm" data-open="${id}">動画を開く</button>
+    ${id==='A'?'<button class="btn sm" id="regN" title="この動画を正常例として、このブラウザに保存します">正常例として登録</button><button class="btn sm" id="unregN" title="登録を解除します">解除</button>':''}
+    <span class="fname" id="fname${id}"></span>
+  </div>
+  <div class="stage" id="stage${id}">
+    <video id="v${id}" muted playsinline preload="auto" disablepictureinpicture></video>
+    <canvas class="ov" id="ov${id}"></canvas>
+    <div class="ph" id="ph${id}"><div><b style="font-size:17px">ここをクリックして動画を選ぶ</b><br><span style="font-size:12px">（ドラッグ＆ドロップでも開けます／H.264のMP4・WebM）</span></div></div>
+    <div class="badge" id="bd${id}"></div>
+  </div>
+  <div class="align">
+    <span title="この動画だけを動かして、もう一方と同じ瞬間にそろえます">位置合わせ</span>
+    <button class="btn xs" data-al="${id}" data-d="-10">◀10</button>
+    <button class="btn xs" data-al="${id}" data-d="-1">◀1</button>
+    <input type="range" id="al${id}" min="0" max="1" step="0.001" value="0">
+    <button class="btn xs" data-al="${id}" data-d="1">1▶</button>
+    <button class="btn xs" data-al="${id}" data-d="10">10▶</button>
+    <span class="tm" id="tm${id}">—</span>
+  </div>
+</div>`;
+}
+function alignBy(id,frames){
+  if(!S.vids[id].loaded) return;
+  if(S.playing||S.holding) pause();
+  const V=S.vids[id];
+  V.off=Math.round((V.off+frames/S.fps)*S.fps)/S.fps;
+  seekAll(S.t); renderAll();
+}
+
+/* ========== スロー区間・停止・書き込み ========== */
+function renderSegs(){
+  const d=S.segDraft;
+  $('#segDraft').textContent=(d.s==null&&d.e==null)?'コマを選んで「開始点」「終了点」を押し、区間を追加します。':
+    `開始：${d.s==null?'未設定':fmt(d.s)}　終了：${d.e==null?'未設定':fmt(d.e)}`;
+  $('#accN1').textContent=S.segs.length?`（${S.segs.length}件）`:'';
+  $('#segList').innerHTML=S.segs.length?S.segs.map(s=>`<div class="it" data-id="${s.id}">
+    <span>${s.s.toFixed(2)}〜${s.e.toFixed(2)}秒</span><b style="color:#9a3412">×${s.rate}</b><span class="grow"></span>
+    <button class="btn xs" data-seg-play="${s.id}">▶ 確認</button><button class="btn xs" data-seg-loop="${s.id}" title="この区間をくり返し再生します">🔁</button><button class="btn xs danger" data-seg-del="${s.id}">削除</button></div>`).join(''):'<div class="hint">まだ区間はありません。</div>';
+}
+function renderHolds(){
+  $('#accN2').textContent=S.holds.length?`（${S.holds.length}件）`:'';
+  $('#holdList').innerHTML=S.holds.length?S.holds.map(h=>`<div class="it">
+    <a href="#" data-hold-go="${h.id}">${h.t.toFixed(2)}秒</a><span>${h.dur}秒止める</span>
+    <span class="hint">書き込み${h.ann.length}件</span><span class="grow"></span>
+    <button class="btn xs danger" data-hold-del="${h.id}">削除</button></div>`).join(''):'<div class="hint">まだ停止演出はありません。「ここで止める」で追加できます。</div>';
+}
+function ensureHold(){
+  let h=activeHold();
+  if(!h){
+    h={id:uid(),t:S.t,dur:+$('#holdDur').value,ann:[]}; S.holds.push(h); S.holds.sort((x,y)=>x.t-y.t);
+    toast(`この位置に停止演出（${h.dur}秒）を作りました`);
+  }
+  return h;
+}
+function addAnn(a){const h=ensureHold(); h.ann.push(a); renderHolds(); uiTick();}
+function openTextInput(id,e){
+  const st=$('#stage'+id), b=st.getBoundingClientRect(), r=contentRect(id);
+  const p={x:clamp((e.clientX-b.left-r.x)/r.w,0,1),y:clamp((e.clientY-b.top-r.y)/r.h,0,1)};
+  const inp=document.createElement('input'); inp.className='tin'; inp.placeholder='コメントを入力→Enter';
+  inp.style.left=Math.min(e.clientX-b.left,st.clientWidth-160)+'px'; inp.style.top=(e.clientY-b.top)+'px';
+  st.appendChild(inp); inp.focus();
+  let done=false;
+  const commit=ok=>{ if(done) return; done=true; const v=inp.value.trim(); inp.remove(); if(ok&&v) addAnn({type:'text',panel:id,x:p.x,y:p.y,text:v,color:S.color}); };
+  inp.addEventListener('keydown',ev=>{ev.stopPropagation(); if(ev.key==='Enter') commit(true); if(ev.key==='Escape') commit(false);});
+  inp.addEventListener('blur',()=>commit(true));
+}
+function setTool(n){
+  S.tool=n; if(n!=='manual') S.manualTrack=null;
+  $$('.tool').forEach(x=>x.classList.toggle('on',x.dataset.tool===n));
+  $$('.stage').forEach(st=>st.classList.toggle('draw',n!=='none'));
+}
+function bindOverlay(id){
+  const c=$('#ov'+id);
+  const pos=e=>{const b=c.getBoundingClientRect(), r=contentRect(id); return {x:clamp((e.clientX-b.left-r.x)/r.w,0,1),y:clamp((e.clientY-b.top-r.y)/r.h,0,1)};};
+  c.addEventListener('pointerdown',e=>{
+    if(S.tool==='none'||!S.vids[id].loaded) return;
+    e.preventDefault(); if(S.playing||S.holding) pause();
+    const p=pos(e);
+    if(S.tool==='arrow'){c.setPointerCapture(e.pointerId); S.drag={panel:id,a:{type:'arrow',panel:id,x:p.x,y:p.y,x2:p.x,y2:p.y,color:S.color}};}
+    else if(S.tool==='point') addAnn({type:'point',panel:id,x:p.x,y:p.y,label:$('#lmSel').value,color:S.color});
+    else if(S.tool==='text') openTextInput(id,e);
+    else if(S.tool==='track') startTrackAt(id,p);
+    else if(S.tool==='manual') manualClick(id,p);
+    else if(S.tool==='fix') fixTrackAt(id,p);
+    else if(S.tool==='scale') scaleClick(id,p);
+  });
+  c.addEventListener('pointermove',e=>{ if(S.drag&&S.drag.panel===id){const p=pos(e); S.drag.a.x2=p.x;S.drag.a.y2=p.y; drawOverlays();} });
+  const end=()=>{ if(S.drag&&S.drag.panel===id){const a=S.drag.a; S.drag=null; if(Math.hypot(a.x2-a.x,a.y2-a.y)>0.015) addAnn(a); else drawOverlays();} };
+  c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end);
+}
+
+/* ========== イベント ========== */
+function recordEvent(name){
+  const id=S.evTarget; if(!S.vids[id].loaded){toast(`動画${id}を開いてください`);return;}
+  if(S.playing||S.holding) pause();
+  S.events.push({id:uid(),panel:id,label:name,vt:vtOf(id)});
+  renderEvents(); uiTick();
+}
+function renderEvents(){
+  const list=[...S.events].sort((a,b)=>a.panel===b.panel?a.vt-b.vt:(a.panel<b.panel?-1:1));
+  $('#evList').innerHTML=list.length?`<table class="t"><tr><th>動画</th><th>イベント</th><th>時刻</th><th>コマ</th><th></th></tr>`+list.map(e=>{
+    const ev=EVENTS.find(q=>q.n===e.label)||{c:'#888'};
+    return `<tr><td><span class="pc ${e.panel}">${e.panel}</span></td><td><span class="dot" style="background:${ev.c};display:inline-block;margin-right:4px;vertical-align:-1px"></span>${esc(e.label)}</td>
+    <td>${e.vt.toFixed(2)}s</td><td>F${frameOf(e.vt)}</td>
+    <td style="white-space:nowrap"><button class="btn xs" data-ev-go="${e.id}">▶</button> <button class="btn xs danger" data-ev-del="${e.id}">×</button></td></tr>`;}).join('')+'</table>':'<div class="hint">まだ記録はありません。</div>';
+  const lines=[];
+  for(const p of ['A','B']){
+    const l=list.filter(e=>e.panel===p);
+    for(let i=1;i<l.length;i++) lines.push(`<span class="pc ${p}">${p}</span> ${esc(l[i-1].label)} → ${esc(l[i].label)}：<b>${(l[i].vt-l[i-1].vt).toFixed(2)}秒</b>`);
+  }
+  $('#evIntv').innerHTML=lines.length?lines.join('<br>'):'2つ以上記録すると表示されます。';
+}
+
+/* ========== トリミング ========== */
+function renderTrim(){
+  const T=S.trim, ok=T.on&&T.s!=null&&T.e!=null&&T.e>T.s;
+  $('#trInfo').textContent=ok?`${T.s.toFixed(2)}〜${T.e.toFixed(2)}秒だけ表示`:((T.s==null&&T.e==null)?'長い動画を一部だけ表示':`${T.s==null?'—':T.s.toFixed(2)}〜${T.e==null?'—':T.e.toFixed(2)}`);
+  drawTL();
+}
+function setTrimPoint(which){
+  if(!loadedIds().length){toast('先に動画を開いてください');return;}
+  if(S.playing||S.holding) pause();
+  const T=S.trim, old=T[which]; T[which]=S.t;
+  if(T.s!=null&&T.e!=null){
+    if(T.e>T.s){ T.on=true; seekAll(S.t); }
+    else { T[which]=old; toast('終点は始点より後のコマにしてください'); }
+  }
+  renderTrim(); uiTick();
+}
+function resetTrim(){ S.trim={s:null,e:null,on:false}; seekAll(S.t); renderTrim(); uiTick(); }
+
+/* ========== 軌跡追従（画像のパターン照合）========== */
+const TRK_COL=['#22d3ee','#facc15','#f472b6','#a3e635','#fb923c','#c084fc'];
+const TRK={gc:null,gx:null,gw:0,gh:0};
+const frameCount=id=>Math.max(1,Math.ceil(S.vids[id].dur*S.fps-1e-4));
+function panelFrame(id){const V=S.vids[id]; if(!V.loaded) return 0; return clamp(frameOf(liveVt(id)),0,frameCount(id)-1);}
+function trackKeys(tr){ if(!tr._k) tr._k=Object.keys(tr.pts).map(Number).sort((a,b)=>a-b); return tr._k; }
+function trackRangeFrames(id){
+  const V=S.vids[id], [a,b]=tRange(), last=frameCount(id)-1;
+  const f0=clamp(Math.ceil((a+V.off)*S.fps-1e-4),0,last), f1=clamp(Math.floor((b-1/S.fps+V.off)*S.fps+1e-4),0,last);
+  return [f0,Math.max(f0,f1)];
+}
+function trkPrep(id){
+  const V=S.vids[id], sc=Math.min(1,640/V.w);
+  TRK.gw=Math.round(V.w*sc); TRK.gh=Math.round(V.h*sc);
+  if(!TRK.gc) TRK.gc=document.createElement('canvas');
+  TRK.gc.width=TRK.gw; TRK.gc.height=TRK.gh; TRK.gx=TRK.gc.getContext('2d',{willReadFrequently:true});
+}
+function seekEl(el,t){
+  return new Promise(res=>{
+    if(Math.abs(el.currentTime-t)<1e-4){res();return;}
+    let done=false; const fin=()=>{if(done)return;done=true;el.removeEventListener('seeked',fin);res();};
+    el.addEventListener('seeked',fin); el.currentTime=t; setTimeout(fin,1500);
+  });
+}
+const WC={};
+function winW(ts){
+  if(WC[ts]) return WC[ts];
+  const w=new Float32Array(ts*ts), h=ts>>1, sg=ts*0.3; let k=0;
+  for(let y=0;y<ts;y++) for(let x=0;x<ts;x++){const dx=x-h,dy=y-h; w[k++]=Math.exp(-(dx*dx+dy*dy)/(2*sg*sg));}
+  return WC[ts]=w;
+}
+async function grabGray(id,f){
+  const V=S.vids[id]; await seekEl(V.el,(f+0.5)/S.fps);
+  const {gw,gh,gx}=TRK; gx.drawImage(V.el,0,0,gw,gh);
+  const d=gx.getImageData(0,0,gw,gh).data, n=gw*gh, g0=new Float32Array(n);
+  for(let i=0;i<n;i++) g0[i]=0.299*d[4*i]+0.587*d[4*i+1]+0.114*d[4*i+2];
+  const g=new Float32Array(g0); // 3x3 平均でノイズを減らす
+  for(let y=1;y<gh-1;y++) for(let x=1;x<gw-1;x++){
+    const o=y*gw+x; g[o]=(g0[o-gw-1]+g0[o-gw]+g0[o-gw+1]+g0[o-1]+g0[o]+g0[o+1]+g0[o+gw-1]+g0[o+gw]+g0[o+gw+1])/9;
+  }
+  // 背景のゆるやかな明暗を引いて、骨の輪郭など「細かい構造」だけを残す
+  const W1=gw+1, S1=new Float64Array(W1*(gh+1));
+  for(let y=0;y<gh;y++){ let rs=0; for(let x=0;x<gw;x++){ rs+=g[y*gw+x]; S1[(y+1)*W1+x+1]=S1[y*W1+x+1]+rs; } }
+  const R=7, hp=new Float32Array(n);
+  for(let y=0;y<gh;y++){
+    const y0=Math.max(0,y-R), y1=Math.min(gh-1,y+R);
+    for(let x=0;x<gw;x++){
+      const x0=Math.max(0,x-R), x1=Math.min(gw-1,x+R), area=(x1-x0+1)*(y1-y0+1);
+      const m=(S1[(y1+1)*W1+x1+1]-S1[y0*W1+x1+1]-S1[(y1+1)*W1+x0]+S1[y0*W1+x0])/area;
+      hp[y*gw+x]=g[y*gw+x]-m;
+    }
+  }
+  return {g:hp};
+}
+function fromRaw(raw,ts){
+  const w=winW(ts), n=raw.length; let sw=0,sm=0;
+  for(let i=0;i<n;i++){sw+=w[i]; sm+=w[i]*raw[i];}
+  const mw=sm/sw, t0w=new Float32Array(n); let ss=0;
+  for(let i=0;i<n;i++){const v=raw[i]-mw; t0w[i]=w[i]*v; ss+=w[i]*v*v;}
+  return {ts,h:ts>>1,raw,t0w,w,norm:Math.sqrt(ss)||1};
+}
+function cutPatch(im,cx,cy,ts){
+  const h=ts>>1, raw=new Float32Array(ts*ts), gw=TRK.gw; let k=0;
+  for(let yy=0;yy<ts;yy++){ const o=(cy-h+yy)*gw+(cx-h); for(let xx=0;xx<ts;xx++) raw[k++]=im.g[o+xx]; }
+  return raw;
+}
+function nccAt(im,tm,x,y){
+  const ts=tm.ts, h=tm.h, gw=TRK.gw, gh=TRK.gh;
+  const x0=x-h, y0=y-h;
+  if(x0<0||y0<0||x0+ts>gw||y0+ts>gh) return -2;
+  const g=im.g, T=tm.t0w, Wt=tm.w; let num=0,den=0,k=0;
+  for(let yy=y0;yy<y0+ts;yy++){ const o=yy*gw+x0; for(let xx=0;xx<ts;xx++){ const v=g[o+xx]; num+=v*T[k]; den+=v*v*Wt[k]; k++; } }
+  if(den<1e-6) return -1;
+  return num/(Math.sqrt(den)*tm.norm);
+}
+function trackStep(im,tm,cx,cy,vx,vy,r){
+  const h=tm.h;
+  const px=Math.round(clamp(cx+vx*0.5,h,TRK.gw-h-1)), py=Math.round(clamp(cy+vy*0.5,h,TRK.gh-h-1));
+  let best=-3,bx=px,by=py;
+  for(let y=py-r;y<=py+r;y++) for(let x=px-r;x<=px+r;x++){ const v=nccAt(im,tm,x,y); if(v>best){best=v;bx=x;by=y;} }
+  let sx=bx, sy=by;
+  const l=nccAt(im,tm,bx-1,by), rr=nccAt(im,tm,bx+1,by), u=nccAt(im,tm,bx,by-1), d=nccAt(im,tm,bx,by+1);
+  if(l>-1&&rr>-1){const den=l-2*best+rr; if(den<-1e-9) sx=bx+clamp(0.5*(l-rr)/den,-0.5,0.5);}
+  if(u>-1&&d>-1){const den=u-2*best+d; if(den<-1e-9) sy=by+clamp(0.5*(u-d)/den,-0.5,0.5);}
+  return {x:sx,y:sy,c:best};
+}
+function showTrk(on,msg,frac){
+  $('#trkModal').classList.toggle('show',on);
+  if(msg!=null) $('#trkMsg').textContent=msg;
+  if(frac!=null) $('#trkBar').style.width=(frac*100)+'%';
+}
+async function runTrack(tr,fromF,dirs,range){
+  const id=tr.panel, cfg=S.trackCfg; trkPrep(id);
+  const [rf0,rf1]=range, {gw,gh}=TRK;
+  S.tracking=true; S.trkCancel=false;
+  let total=0; for(const d of dirs) total+=d>0?Math.max(0,rf1-fromF):Math.max(0,fromF-rf0);
+  total=Math.max(1,total); let done=0;
+  showTrk(true,'準備中…',0);
+  try{
+    const im0=await grabGray(id,fromF), p0=tr.pts[fromF], h=cfg.ts>>1;
+    const sx=clamp(Math.round(p0[0]*gw),h,gw-h-1), sy=clamp(Math.round(p0[1]*gh),h,gh-h-1);
+    const seedRaw=cutPatch(im0,sx,sy,cfg.ts);
+    for(const dir of dirs){
+      let tm=fromRaw(seedRaw,cfg.ts), cx=p0[0]*gw, cy=p0[1]*gh, vx=0, vy=0;
+      const end=dir>0?rf1:rf0;
+      for(let f=fromF+dir; dir>0?f<=end:f>=end; f+=dir){
+        if(S.trkCancel) break;
+        const im=await grabGray(id,f);
+        const r=trackStep(im,tm,cx,cy,vx,vy,cfg.rad);
+        let nx=r.x, ny=r.y;
+        if(r.c<0.12){ nx=cx+vx*0.5; ny=cy+vy*0.5; }   // 完全に見失ったときだけ、勢いで進める
+        vx=nx-cx; vy=ny-cy; cx=nx; cy=ny;
+        tr.pts[f]=[+(cx/gw).toFixed(5),+(cy/gh).toFixed(5),+Math.max(0,r.c).toFixed(3),0];
+        if(cfg.upd && r.c>=0.7){   // 最初の見本を6割残したまま、直近の形を少し混ぜる（背景に引っ張られにくい）
+          const ix=clamp(Math.round(cx),h,gw-h-1), iy=clamp(Math.round(cy),h,gh-h-1);
+          const patch=cutPatch(im,ix,iy,cfg.ts), nr=new Float32Array(patch.length);
+          for(let i=0;i<nr.length;i++) nr[i]=0.6*seedRaw[i]+0.4*patch[i];
+          tm=fromRaw(nr,cfg.ts);
+        }
+        done++;
+        if(done%3===0){ tr._k=null; showTrk(true,`追跡中… ${done} / ${total} コマ`,done/total); drawOverlays(); }
+      }
+    }
+  }finally{
+    tr._k=null; S.tracking=false; showTrk(false);
+    seekAll(S.t);
+  }
+}
+/* ---- 手動で追う（クリックした位置の間をなめらかにつなぐ）---- */
+function interpolateTrack(tr){
+  const ks=Object.keys(tr.pts).map(Number).sort((a,b)=>a-b);
+  for(const k of ks) if(tr.pts[k][3]===2) delete tr.pts[k];
+  const man=ks.filter(k=>tr.pts[k]&&tr.pts[k][3]===1);
+  if(man.length>=2){
+    const P=i=>tr.pts[man[clamp(i,0,man.length-1)]];
+    for(let i=0;i<man.length-1;i++){
+      const k0=man[i], k1=man[i+1], p0=P(i-1), p1=P(i), p2=P(i+1), p3=P(i+2);
+      for(let k=k0+1;k<k1;k++){
+        const u=(k-k0)/(k1-k0);
+        const cr=(a,b,c,d)=>0.5*((2*b)+(-a+c)*u+(2*a-5*b+4*c-d)*u*u+(-a+3*b-3*c+d)*u*u*u);
+        tr.pts[k]=[+cr(p0[0],p1[0],p2[0],p3[0]).toFixed(5),+cr(p0[1],p1[1],p2[1],p3[1]).toFixed(5),1,2];
+      }
+    }
+  }
+  tr._k=null;
+}
+function manualClick(id,p){
+  if(S.playing||S.holding) pause();
+  const f=panelFrame(id), rg=trackRangeFrames(id);
+  let tr=S.tracks.find(t=>t.id===S.manualTrack);
+  if(!tr||tr.panel!==id){
+    if(f<rg[0]||f>rg[1]){toast('今のコマは、追う範囲（トリミング）の外です');return;}
+    tr={id:uid(),panel:id,name:$('#trkName').value,color:TRK_COL[S.tracks.length%TRK_COL.length],show:true,pts:{},restF:f,mode:'manual',_k:null};
+    S.tracks.push(tr); S.manualTrack=tr.id; S.trackSel=tr.id;
+  }
+  tr.pts[f]=[+p.x.toFixed(5),+p.y.toFixed(5),1,1];
+  interpolateTrack(tr); renderTracks();
+  S.flash={panel:id,x:p.x,y:p.y,t0:performance.now(),color:tr.color};
+  const fade=()=>{ drawOverlays(); if(S.flash&&performance.now()-S.flash.t0<700) requestAnimationFrame(fade); };
+  requestAnimationFrame(fade);
+  const n=+$('#manStep').value, nxt=f+n;
+  if(nxt<=rg[1]) seekAll(nxt/S.fps-S.vids[id].off);
+  else toast('範囲の終わりです。もう一度「手動で追う」を押して終了してください',4000);
+  uiTick();
+}
+async function startTrackAt(id,p){
+  if(S.tracking) return;
+  if(S.playing||S.holding) pause();
+  const f=panelFrame(id), rg=trackRangeFrames(id);
+  if(f<rg[0]||f>rg[1]){toast('今のコマは、追う範囲（トリミング）の外です');return;}
+  const tr={id:uid(),panel:id,name:$('#trkName').value,color:TRK_COL[S.tracks.length%TRK_COL.length],show:true,pts:{},restF:rg[0],_k:null};
+  tr.pts[f]=[+p.x.toFixed(5),+p.y.toFixed(5),1,1];
+  S.tracks.push(tr); S.trackSel=tr.id; setTool('none'); renderTracks();
+  await runTrack(tr,f,[1,-1],rg);
+  renderTracks(); uiTick();
+  const fl=trackKeys(tr).filter(k=>tr.pts[k][2]<0.5&&!tr.pts[k][3]).length;
+  toast(fl?`追跡が終わりました。自信の低いコマが${fl}あります（オレンジの印）`:'追跡が終わりました',4500);
+}
+async function fixTrackAt(id,p){
+  if(S.tracking) return;
+  const tr=S.tracks.find(t=>t.id===S.trackSel);
+  if(!tr||tr.panel!==id){toast('直したい点を②の一覧で選び、その動画の上でクリックしてください');return;}
+  if(S.playing||S.holding) pause();
+  const f=panelFrame(id), rg=trackRangeFrames(id);
+  if(tr.mode==='manual'){ tr.pts[f]=[+p.x.toFixed(5),+p.y.toFixed(5),1,1]; interpolateTrack(tr); setTool('none'); renderTracks(); uiTick(); return; }
+  tr.pts[f]=[+p.x.toFixed(5),+p.y.toFixed(5),1,1]; tr._k=null; setTool('none');
+  await runTrack(tr,f,[1],[Math.min(f,rg[0]),Math.max(f,rg[1])]);
+  renderTracks(); uiTick();
+}
+function drawTracks(g,r,id,curF){
+  if(!S.tracks.length) return;
+  const X=v=>r.x+v*r.w, Y=v=>r.y+v*r.h, lw=Math.max(2,r.h/200);
+  for(const tr of S.tracks){
+    if(tr.panel!==id||!tr.show) continue;
+    const ks=trackKeys(tr); if(!ks.length) continue;
+    if(S.tool==='manual'&&tr.id===S.manualTrack){
+      const q0=tr.pts[curF];
+      if(q0){ g.strokeStyle=tr.color; g.lineWidth=1.5; g.beginPath(); g.arc(X(q0[0]),Y(q0[1]),Math.max(6,r.h/80),0,7); g.stroke(); }
+      continue;
+    }
+    const sel=tr.id===S.trackSel, k0=ks[0], k1=ks[ks.length-1];
+    const vis=S.trackUpTo?ks.filter(k=>k<=curF):ks, st=S.trackStyle;
+    if(st==='dots'){
+      g.fillStyle=tr.color;
+      for(const k of vis){const q=tr.pts[k]; g.beginPath(); g.arc(X(q[0]),Y(q[1]),lw*1.2,0,7); g.fill();}
+    }else{
+      g.lineWidth=lw*1.5; g.lineCap='round';
+      for(let i=1;i<vis.length;i++){
+        if(vis[i]-vis[i-1]>1) continue;
+        const a=tr.pts[vis[i-1]], b=tr.pts[vis[i]];
+        g.strokeStyle=st==='color'?`hsl(${220-220*(vis[i]-k0)/Math.max(1,k1-k0)},95%,58%)`:tr.color;
+        g.beginPath(); g.moveTo(X(a[0]),Y(a[1])); g.lineTo(X(b[0]),Y(b[1])); g.stroke();
+      }
+    }
+    if(tr.mode==='manual'&&!S.playing&&!S.holding){
+      for(const k of vis){const q=tr.pts[k]; if(q[3]===1){ g.fillStyle='#fff'; g.strokeStyle=tr.color; g.lineWidth=lw; g.beginPath(); g.arc(X(q[0]),Y(q[1]),lw*1.2,0,7); g.fill(); g.stroke(); }}
+    }
+    if(tr.restF!=null&&tr.pts[tr.restF]){ const q=tr.pts[tr.restF], x=X(q[0]), y=Y(q[1]), z=lw*3;
+      g.strokeStyle=tr.color; g.lineWidth=lw; g.beginPath(); g.moveTo(x-z,y);g.lineTo(x+z,y);g.moveTo(x,y-z);g.lineTo(x,y+z); g.stroke(); }
+    const q=tr.pts[curF];
+    if(q){
+      const x=X(q[0]), y=Y(q[1]), low=q[2]<0.5&&!q[3];
+      g.strokeStyle=low?'#f97316':tr.color; g.lineWidth=sel?lw*2:lw*1.4;
+      g.beginPath(); g.arc(x,y,lw*4,0,7); g.stroke();
+      g.fillStyle=tr.color; g.beginPath(); g.arc(x,y,lw*1.2,0,7); g.fill();
+      const fs=Math.max(12,r.h/30); g.font=`700 ${fs}px "Yu Gothic UI",Meiryo,sans-serif`; g.textBaseline='middle';
+      const tx=x+lw*6, w=g.measureText(tr.name).width;
+      g.fillStyle='rgba(0,0,0,.6)'; g.fillRect(tx-3,y-fs*0.65,w+6,fs*1.3); g.fillStyle=tr.color; g.fillText(tr.name,tx,y);
+    }
+  }
+}
+
+/* ---- 大きさの基準 ---- */
+const SEX_MM={unk:50,M:54,F:46};
+function mmPerPx(id){
+  const sc=S.scale[id], V=S.vids[id]; if(!sc.p1||!sc.p2||!V.w) return null;
+  const len=Math.hypot((sc.p2[0]-sc.p1[0])*V.w,(sc.p2[1]-sc.p1[1])*V.h); return len>0?sc.mm/len:null;
+}
+function drawScaleLine(g,r,id){
+  const sc=S.scale[id], d=S.scaleDraft, X=v=>r.x+v*r.w, Y=v=>r.y+v*r.h;
+  const pts=(d&&d.panel===id)?d.pts:(sc.p1&&sc.p2?[sc.p1,sc.p2]:[]);
+  if(!pts.length) return;
+  g.strokeStyle='#fde047'; g.fillStyle='#fde047'; g.lineWidth=Math.max(2,r.h/220);
+  for(const q of pts){ g.beginPath(); g.arc(X(q[0]),Y(q[1]),Math.max(3,r.h/120),0,7); g.fill(); }
+  if(pts.length===2){
+    g.setLineDash([6,4]); g.beginPath(); g.moveTo(X(pts[0][0]),Y(pts[0][1])); g.lineTo(X(pts[1][0]),Y(pts[1][1])); g.stroke(); g.setLineDash([]);
+    const fs=Math.max(12,r.h/32); g.font=`700 ${fs}px "Yu Gothic UI",Meiryo,sans-serif`; g.textBaseline='middle';
+    const txt=(sc.method==='c24'?'C2–C4 ':'基準 ')+sc.mm+'mm', mx=(X(pts[0][0])+X(pts[1][0]))/2+8, my=(Y(pts[0][1])+Y(pts[1][1]))/2, w=g.measureText(txt).width;
+    g.fillStyle='rgba(0,0,0,.6)'; g.fillRect(mx-3,my-fs*0.65,w+6,fs*1.3); g.fillStyle='#fde047'; g.fillText(txt,mx,my);
+  }
+}
+function scaleClick(id,p){
+  const d=S.scaleDraft;
+  if(!d||d.panel!==id){ S.scaleDraft={panel:id,pts:[[+p.x.toFixed(5),+p.y.toFixed(5)]]}; S.scPanel=id; $$('input[name=scP]').forEach(r=>r.checked=r.value===id); toast('1点目を記録しました。次に2点目（上側）をクリック'); uiTick(); return; }
+  d.pts.push([+p.x.toFixed(5),+p.y.toFixed(5)]);
+  const sc=S.scale[id]; sc.p1=d.pts[0]; sc.p2=d.pts[1]; S.scaleDraft=null; setTool('none');
+  renderScale(); renderMetrics(); uiTick(); toast('大きさの基準を設定しました');
+}
+function renderScale(){
+  const id=S.scPanel, sc=S.scale[id], c24=sc.method==='c24';
+  $('#scMethod').value=sc.method; $('#scSex').value=sc.sex; $('#scMM').value=sc.mm;
+  $('#scSex').style.display=$('#scSexL').style.display=c24?'':'none';
+  $('#scMMl').textContent=c24?'C2–C4の長さ（mm）':'実際の長さ（mm）';
+  const mpp=mmPerPx(id);
+  $('#scInfo').innerHTML=(sc.p1&&sc.p2?`設定済み：画面上の2点間を ${sc.mm}mm として換算（1ピクセル ≒ ${mpp?mpp.toFixed(3):'—'}mm）。`:'未設定：「動画上で2点をクリック」を押し、下側→上側の順にクリックします。')+
+    (c24?'<br>C2・C4それぞれの<b>椎体の前下の角</b>をクリックします。C2–C4の長さは、男女差が平均で約8mmとの報告があり、ここでは仮に 50（男性54／女性46）mmを入れています。施設の基準値や実測値があれば書き換えてください。結果には「C2–C4に対する%」も併記します（体格差の影響を受けにくい表し方）。':'<br>造影用のマーカーや実寸の分かる物など、実際の長さが分かる2点をクリックしてください。');
+}
+/* ---- 計測 ---- */
+function calcMetrics(tr){
+  const V=S.vids[tr.panel], ks=trackKeys(tr); if(ks.length<3||!V.w) return null;
+  const P=ks.map(k=>({k,x:tr.pts[k][0]*V.w,y:tr.pts[k][1]*V.h})), idx={}; ks.forEach((k,i)=>idx[k]=i);
+  const Q=P.map(p=>{const a=P[idx[p.k-1]], b=P[idx[p.k+1]]; return (a&&b)?{k:p.k,x:(a.x+p.x+b.x)/3,y:(a.y+p.y+b.y)/3}:{k:p.k,x:p.x,y:p.y};});
+  const rk=(tr.restF!=null&&idx[tr.restF]!=null)?tr.restF:ks[0], rest=Q[idx[rk]];
+  const sc=S.scale[tr.panel], mpp=mmPerPx(tr.panel), c24=sc.method==='c24'&&sc.p1&&sc.p2;
+  let u=[0,-1], a=[S.trackCfg.face==='left'?-1:1,0], c24px=null;
+  if(c24){
+    let ux=(sc.p2[0]-sc.p1[0])*V.w, uy=(sc.p2[1]-sc.p1[1])*V.h; const L=Math.hypot(ux,uy); c24px=L; ux/=L; uy/=L; if(uy>0){ux=-ux;uy=-uy;}
+    u=[ux,uy]; let ax=-uy, ay=ux; if((a[0]<0)!==(ax<0)){ax=-ax;ay=-ay;} a=[ax,ay];
+  }
+  const m={mpp,c24px,rk,sup:-1e9,kSup:rk,ant:-1e9,kAnt:rk,mag:0,kMag:rk,path:0,vmax:0,kv:rk,flagged:0,n:ks.length};
+  Q.forEach((q,i)=>{
+    const dx=q.x-rest.x, dy=q.y-rest.y, sup=dx*u[0]+dy*u[1], ant=dx*a[0]+dy*a[1], mag=Math.hypot(dx,dy);
+    if(sup>m.sup){m.sup=sup;m.kSup=q.k;} if(ant>m.ant){m.ant=ant;m.kAnt=q.k;} if(mag>m.mag){m.mag=mag;m.kMag=q.k;}
+    if(i>0&&q.k-Q[i-1].k===1) m.path+=Math.hypot(q.x-Q[i-1].x,q.y-Q[i-1].y);
+    if(i>0&&i<Q.length-1&&Q[i+1].k-Q[i-1].k===2){ const v=Math.hypot(Q[i+1].x-Q[i-1].x,Q[i+1].y-Q[i-1].y)/(2/S.fps); if(v>m.vmax){m.vmax=v;m.kv=q.k;} }
+  });
+  m.flagged=ks.filter(k=>tr.pts[k][2]<0.5&&!tr.pts[k][3]).length;
+  m.c24=!!c24; m.mm=sc.mm;
+  return m;
+}
+function fmtMetrics(tr){
+  const m=calcMetrics(tr); if(!m) return null;
+  const len=px=>{ if(m.mpp){ let t=(px*m.mpp).toFixed(1)+' mm'; if(m.c24px) t+=`（${(px/m.c24px*100).toFixed(0)}% C2–C4）`; return t; } return px.toFixed(0)+' px'; };
+  const when=k=>`安静位置から${((k-m.rk)/S.fps).toFixed(2)}秒後`;
+  const rows=[
+    ['安静位置のコマ',`F${m.rk}（${(m.rk/S.fps).toFixed(2)}秒）`,''],
+    ['最大挙上量（上方）',len(Math.max(0,m.sup)),when(m.kSup)],
+    ['最大前方移動',len(Math.max(0,m.ant)),when(m.kAnt)],
+    ['最大移動（直線）',len(m.mag),when(m.kMag)],
+    ['総移動距離（軌跡の長さ）',len(m.path),''],
+    ['最大移動速度',m.mpp?(m.vmax*m.mpp).toFixed(1)+' mm/秒':m.vmax.toFixed(0)+' px/秒',when(m.kv)]
+  ];
+  let note=m.mpp?(m.c24?`上方・前方は、頸椎（C4→C2）の向きに合わせて計算しています。mmは「C2–C4＝${m.mm}mm」と仮定した目安です。`:`上方・前方は、画面の上と顔の向きで計算しています。基準の長さ ${m.mm}mm で換算しています。`):'大きさの基準が未設定のため、px（画面の点の数）で表示しています。④で基準を設定するとmmになります。';
+  if(m.flagged) note+=` 自信の低いコマが${m.flagged}あります。ずれていないか確認してください。`;
+  return {rows,note,m};
+}
+function renderMetrics(){
+  const tr=S.tracks.find(t=>t.id===S.trackSel), box=$('#trkRes');
+  if(!tr){box.innerHTML='<div class="hint">点を追いかけると、ここに結果が出ます。</div>';return;}
+  const r=fmtMetrics(tr);
+  if(!r){box.innerHTML='<div class="hint">追ったコマが少ないため、計測できません。</div>';return;}
+  box.innerHTML=`<div class="sub">${esc(tr.name)}（動画${tr.panel}）</div><table class="t">${r.rows.map(x=>`<tr><th>${x[0]}</th><td><b>${x[1]}</b></td><td class="hint">${x[2]}</td></tr>`).join('')}</table><div class="hint" style="margin-top:4px">${r.note}</div>`;
+}
+function renderTracks(){
+  $('#trkList').innerHTML=S.tracks.length?S.tracks.map(t=>{
+    const ks=trackKeys(t), fl=ks.filter(k=>t.pts[k][2]<0.5&&!t.pts[k][3]).length;
+    return `<div class="it ${t.id===S.trackSel?'sel':''}" data-trk="${t.id}"><span class="dot" style="background:${t.color}"></span><b>${esc(t.name)}</b><span class="pc ${t.panel}">${t.panel}</span><span class="hint">${ks.length}コマ・要確認${fl}</span><span class="grow"></span><button class="btn xs" data-trk-show="${t.id}">${t.show?'表示中':'非表示'}</button><button class="btn xs danger" data-trk-del="${t.id}">削除</button></div>`;
+  }).join(''):'<div class="hint">まだありません。</div>';
+  renderMetrics();
+}
+function jumpFlag(dir){
+  const tr=S.tracks.find(t=>t.id===S.trackSel); if(!tr){toast('点を選んでください');return;}
+  const cur=panelFrame(tr.panel), ks=trackKeys(tr).filter(k=>tr.pts[k][2]<0.5&&!tr.pts[k][3]);
+  const t=dir>0?ks.find(k=>k>cur):[...ks].reverse().find(k=>k<cur);
+  if(t==null){toast('これ以上、要確認のコマはありません');return;}
+  if(S.playing||S.holding) pause();
+  seekAll(t/S.fps-S.vids[tr.panel].off); uiTick();
+}
+
+/* ========== 評価 ========== */
+function renderTrials(){
+  $('#trials').innerHTML=S.trials.map((t,i)=>`<div class="trial" data-id="${t.id}">
+    <div class="tg">
+      <label>食形態・量</label><input data-k="food" value="${esc(t.food)}" placeholder="例：とろみ水 5mL">
+      <label title="Penetration-Aspiration Scale：喉頭侵入・誤嚥の重症度（1〜8）">PAS</label>
+      <select data-k="pas">${PAS.map((p,j)=>`<option value="${j||''}" ${String(t.pas)===String(j||'')?'selected':''}>${p||'未評価'}</option>`).join('')}</select>
+      <label title="喉頭蓋の付け根のくぼみ">喉頭蓋谷の残留</label>
+      <select data-k="val">${RES.map(r=>`<option value="${r}" ${t.val===r?'selected':''}>${r||'未評価'}</option>`).join('')}</select>
+      <label title="喉頭の両脇のくぼみ">梨状陥凹の残留</label>
+      <select data-k="pyr">${RES.map(r=>`<option value="${r}" ${t.pyr===r?'selected':''}>${r||'未評価'}</option>`).join('')}</select>
+      <label>メモ</label><input data-k="memo" value="${esc(t.memo)}">
+    </div>
+    <div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn xs danger" data-trial-del="${t.id}">この評価を削除</button></div>
+  </div>`).join('')||'<div class="hint" style="margin-bottom:6px">「＋ 評価を追加」で、食形態ごとの評価を入力できます。</div>';
+}
+const newTrial=()=>({id:uid(),food:'',pas:'',val:'',pyr:'',memo:''});
+
+/* ========== キャプチャ ========== */
+function layoutComposite(ids,H,showHead){
+  const even=x=>Math.max(2,Math.round(x/2)*2);
+  H=even(H);
+  const panes=ids.map(id=>{const V=S.vids[id]; return {id,w:even(V.w*H/V.h),h:H};});
+  const gap=8, head=showHead?34:0;
+  const W=panes.reduce((t,p)=>t+p.w,0)+gap*(panes.length-1);
+  return {panes,gap,head,W,H:H+head};
+}
+function liveVt(id){const V=S.vids[id]; return (S.playing&&!S.holding&&!V.el.paused)?V.el.currentTime:vtOf(id);}
+function drawComposite(c,lay){
+  const g=c.getContext('2d'); g.fillStyle='#111'; g.fillRect(0,0,c.width,c.height);
+  const ah=activeHold(), head=lay.head; let x=0;
+  for(const p of lay.panes){
+    const V=S.vids[p.id];
+    try{g.drawImage(V.el,x,head,p.w,p.h);}catch(e){}
+    if(!inRange(p.id,S.t)){g.fillStyle='rgba(0,0,0,.65)'; g.fillRect(x,head,p.w,p.h);}
+    if(ah) for(const a of ah.ann) if(a.panel===p.id) drawAnn(g,{x,y:head,w:p.w,h:p.h},a);
+    drawTracks(g,{x,y:head,w:p.w,h:p.h},p.id,panelFrame(p.id));
+    if(head){
+      g.fillStyle=p.id==='A'?'#2563eb':'#ea580c'; g.fillRect(x,0,p.w,head-4);
+      g.fillStyle='#fff'; g.font='bold 16px "Yu Gothic UI",Meiryo,sans-serif'; g.textBaseline='middle';
+      g.fillText(`${p.id}：${V.label}　${liveVt(p.id).toFixed(2)}秒`,x+8,(head-4)/2);
+    }
+    x+=p.w+lay.gap;
+  }
+  if(S.playing&&!S.holding){
+    const r=rateAt(S.t);
+    if(r!==1){const fs=Math.max(16,lay.H/20); g.font=`bold ${fs}px "Yu Gothic UI",Meiryo,sans-serif`; g.textBaseline='bottom';
+      const txt=`スロー ×${r}`, w=g.measureText(txt).width;
+      g.fillStyle='rgba(0,0,0,.6)'; g.fillRect(8,c.height-fs*1.5-8,w+16,fs*1.4); g.fillStyle='#fde68a'; g.fillText(txt,16,c.height-12);}
+  }
+}
+function composeFrame(H=480){
+  const ids=loadedIds(); if(!ids.length) return null;
+  const lay=layoutComposite(ids,H,true);
+  const c=document.createElement('canvas'); c.width=lay.W; c.height=lay.H;
+  drawComposite(c,lay); return c;
+}
+function capture(){
+  if(!loadedIds().length){toast('動画を開いてください');return;}
+  if(S.playing||S.holding) pause();
+  const c=composeFrame();
+  S.caps.push({id:uid(),img:c.toDataURL('image/jpeg',0.9),cap:`共通時間 ${S.t.toFixed(2)}秒`});
+  renderCaps(); toast('画像を追加しました（「画像・出力」タブ）');
+}
+
+/* ========== ループ ========== */
+function renderLoop(){
+  const L=S.loop, ok=L.s!=null&&L.e!=null&&L.e>L.s;
+  $('#lpOn').textContent='くり返し '+(L.on&&ok?'ON':'OFF');
+  $('#lpOn').classList.toggle('on',L.on&&ok);
+  $('#lpInfo').textContent=(L.s==null&&L.e==null)?'始点と終点を設定':`${L.s==null?'—':L.s.toFixed(2)}〜${L.e==null?'—':L.e.toFixed(2)}秒`;
+  drawTL();
+}
+function setLoopPoint(which){
+  if(!loadedIds().length){toast('先に動画を開いてください');return;}
+  if(S.playing||S.holding) pause();
+  S.loop[which]=S.t;
+  const L=S.loop;
+  if(L.s!=null&&L.e!=null){
+    if(L.e>L.s) L.on=true; else {toast('終点は始点より後のコマにしてください'); L.on=false;}
+  }
+  renderLoop();
+}
+
+/* ========== 動画の書き出し ========== */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function startExport(){
+  if(S.exporting) return;
+  const ids=loadedIds(); if(!ids.length){toast('先に動画を開いてください');return;}
+  if(typeof MediaRecorder==='undefined'||!HTMLCanvasElement.prototype.captureStream){toast('このブラウザでは書き出せません。ChromeまたはEdgeをお使いください',4500);return;}
+  const types=['video/mp4;codecs=avc1.640028','video/mp4;codecs=avc1.42E01E','video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mime=types.find(t=>MediaRecorder.isTypeSupported(t));
+  if(!mime){toast('このブラウザでは動画を書き出せません',4500);return;}
+  const lay0=$('#expLayout').value;
+  const use=lay0==='both'?ids:ids.filter(i=>i===lay0);
+  if(!use.length){toast(`動画${lay0}が開かれていません`);return;}
+  let t0=tRange()[0], t1=Infinity, tEnd=tLast();
+  if($('#expRange').value==='loop'){
+    const L=S.loop; if(L.s==null||L.e==null||L.e<=L.s){toast('先にループの始点と終点を設定してください');return;}
+    t0=L.s; t1=L.e; tEnd=L.e;
+  }
+  const H=+$('#expH').value, showHead=$('#expHead').checked;
+  const lay=layoutComposite(use,H,showHead);
+  const canvas=document.createElement('canvas'); canvas.width=lay.W; canvas.height=lay.H;
+  if(S.playing||S.holding) pause();
+  const E={canvas,lay,mime,ext:mime.startsWith('video/mp4')?'mp4':'webm',t0,t1,tEnd,chunks:[],start:performance.now(),drawing:false,cancelled:false,finishing:false,hidden:false};
+  S.exp=E; S.exporting=true;
+  $('#expModal').classList.add('show'); $('#expBar').style.width='0'; $('#expMsg').textContent='準備中…';
+  seekAll(t0); await sleep(500);
+  drawComposite(canvas,lay);
+  const bps=Math.round(clamp(lay.W*lay.H*4,2e6,16e6));
+  let rec;
+  try{ rec=new MediaRecorder(canvas.captureStream(30),{mimeType:mime,videoBitsPerSecond:bps}); }
+  catch(err){ S.exporting=false; S.exp=null; $('#expModal').classList.remove('show'); toast('書き出しを開始できませんでした'); return; }
+  E.rec=rec;
+  rec.ondataavailable=ev=>{ if(ev.data&&ev.data.size) E.chunks.push(ev.data); };
+  rec.onstop=()=>onExportStop(E);
+  rec.start(500);
+  E.drawing=true; E.start=performance.now(); expDrawLoop();
+  await sleep(300);
+  if(!E.cancelled) play();
+}
+function expDrawLoop(){
+  const E=S.exp; if(!E||!E.drawing) return;
+  drawComposite(E.canvas,E.lay);
+  const el=(performance.now()-E.start)/1000;
+  const frac=clamp((S.t-E.t0)/Math.max(1e-6,E.tEnd-E.t0),0,1);
+  $('#expBar').style.width=(frac*100)+'%';
+  $('#expMsg').textContent=`録画中… ${el.toFixed(0)}秒経過（形式：${E.ext.toUpperCase()}）`;
+  requestAnimationFrame(expDrawLoop);
+}
+async function finishExport(ok){
+  const E=S.exp; if(!E||E.finishing) return; E.finishing=true; E.cancelled=!ok;
+  if(S.playing||S.holding) pause();
+  await sleep(ok?400:0);
+  E.drawing=false;
+  if(E.rec&&E.rec.state!=='inactive') E.rec.stop(); else onExportStop(E);
+}
+function onExportStop(E){
+  if(E.done) return; E.done=true;
+  S.exporting=false; S.exp=null; $('#expModal').classList.remove('show');
+  if(E.cancelled){toast(E.hidden?'画面を切り替えたため、書き出しを中止しました':'書き出しを中止しました',4000);return;}
+  const blob=new Blob(E.chunks,{type:E.mime.split(';')[0]});
+  if(!blob.size){toast('書き出しに失敗しました');return;}
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`VF_編集動画_${new Date().toISOString().slice(0,16).replace(/[-:T]/g,'')}.${E.ext}`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast(`書き出しました（${E.ext.toUpperCase()}）。ダウンロードフォルダをご確認ください`,5000);
+}
+
+function renderCaps(){
+  $('#caps').innerHTML=S.caps.map((c,i)=>`<div class="cap" data-id="${c.id}"><img src="${c.img}">
+    <div class="row"><input data-capcap value="${esc(c.cap)}" placeholder="説明"><a class="btn xs" href="${c.img}" download="VF_capture_${i+1}.jpg">保存</a><button class="btn xs danger" data-cap-del="${c.id}">×</button></div></div>`).join('')||'<div class="hint">まだ画像はありません。</div>';
+}
+
+/* ========== レポート ========== */
+function buildReport(){
+  const P=S.patient, A=S.vids.A, B=S.vids.B;
+  const kv=(k,v)=>`<th>${k}</th><td>${esc(v)||'&nbsp;'}</td>`;
+  let h=`<h1>嚥下造影検査（VF）評価レポート</h1>
+  <table class="kv"><tr>${kv('患者ID',P.pid)}${kv('氏名',P.name)}</tr><tr>${kv('年齢・性別',[P.age,P.sex].filter(Boolean).join(' / '))}${kv('検査日',P.date)}</tr><tr>${kv('検査者',P.examiner)}${kv('検査条件',P.cond)}</tr></table>`;
+  h+=`<h2>比較した動画</h2><table class="kv"><tr><th>A：${esc(A.label)}</th><td>${esc(A.name)||'（未読み込み）'}</td></tr><tr><th>B：${esc(B.label)}</th><td>${esc(B.name)||'（未読み込み）'}</td></tr>
+  <tr><th>位置合わせ</th><td>A動画 ${A.off.toFixed(2)}秒 と B動画 ${B.off.toFixed(2)}秒 を同じ時刻としています（${S.fps}コマ/秒）</td></tr></table>`;
+  h+=`<h2>評価</h2>`;
+  h+=S.trials.length?`<table><tr><th>食形態・量</th><th>PAS</th><th>喉頭蓋谷の残留</th><th>梨状陥凹の残留</th><th>メモ</th></tr>`+S.trials.map(t=>`<tr><td>${esc(t.food)}</td><td>${esc(PAS[+t.pas]||'')}</td><td>${esc(t.val)}</td><td>${esc(t.pyr)}</td><td>${esc(t.memo)}</td></tr>`).join('')+'</table>':'<div>（入力なし）</div>';
+  h+=`<h2>イベント記録</h2>`;
+  const rows=[];
+  for(const p of ['A','B']){
+    const l=S.events.filter(e=>e.panel===p).sort((a,b)=>a.vt-b.vt);
+    l.forEach((e,i)=>rows.push(`<tr><td>${p}：${esc(S.vids[p].label)}</td><td>${esc(e.label)}</td><td>${e.vt.toFixed(2)}秒（F${frameOf(e.vt)}）</td><td>${i?(e.vt-l[i-1].vt).toFixed(2)+'秒':'—'}</td></tr>`));
+  }
+  h+=rows.length?`<table><tr><th>動画</th><th>イベント</th><th>時刻</th><th>直前のイベントからの間隔</th></tr>${rows.join('')}</table>`:'<div>（記録なし）</div>';
+  const tms=S.tracks.map(t=>({t,r:fmtMetrics(t)})).filter(x=>x.r);
+  if(tms.length){
+    h+=`<h2>ランドマーク計測</h2><table><tr><th>点</th><th>動画</th><th>最大挙上量（上方）</th><th>最大前方移動</th><th>最大移動（直線）</th><th>総移動距離</th><th>最大移動速度</th></tr>`+
+    tms.map(({t,r})=>`<tr><td>${esc(t.name)}</td><td>${t.panel}</td><td>${r.rows[1][1]}</td><td>${r.rows[2][1]}</td><td>${r.rows[3][1]}</td><td>${r.rows[4][1]}</td><td>${r.rows[5][1]}</td></tr>`).join('')+
+    `</table><div style="font-size:10.5px;color:#333">${esc(tms[0].r.note.replace(/ 自信の低いコマが\d+あります。.*$/,''))} 画像から自動で追った位置にもとづく目安であり、診断の自動判定ではありません。</div>`;
+  }
+  h+=`<h2>総合コメント</h2><div style="white-space:pre-wrap;border:1px solid #9aa9b3;padding:6px;min-height:50px">${esc(S.comment)}</div>`;
+  if(S.caps.length) h+=`<h2>画像</h2><div class="figs">`+S.caps.map(c=>`<figure><img src="${c.img}"><figcaption>${esc(c.cap)}</figcaption></figure>`).join('')+'</div>';
+  h+=`<div style="margin-top:10px;font-size:10.5px;color:#333;line-height:1.5"><b>用語：</b>PAS＝Penetration-Aspiration Scale（食べ物がどこまで気道に入ったかを1〜8で表す尺度）／UES＝上部食道括約筋（食道の入口）／喉頭蓋谷・梨状陥凹＝飲み込み後に食べ物が残りやすいのどの2か所のくぼみ</div>`;
+  h+=`<div class="foot">作成：${new Date().toLocaleString('ja-JP')}　／　VF分析支援ツール（試作版）。本資料は評価・教育の補助資料であり、診断の自動判定を行うものではありません。</div>`;
+  return h;
+}
+
+/* ========== 保存・読込 ========== */
+function saveProject(){
+  const o={app:'VF-Support',ver:1,fps:S.fps,mode:S.mode,baseRate:S.baseRate,
+    vids:{A:{name:S.vids.A.name,off:S.vids.A.off,label:S.vids.A.label},B:{name:S.vids.B.name,off:S.vids.B.off,label:S.vids.B.label}},
+    loop:{s:S.loop.s,e:S.loop.e},trim:{s:S.trim.s,e:S.trim.e},tracks:S.tracks.map(t=>({id:t.id,panel:t.panel,name:t.name,color:t.color,show:t.show,restF:t.restF,mode:t.mode,pts:t.pts})),scale:S.scale,trackCfg:S.trackCfg,segs:S.segs,holds:S.holds,events:S.events,trials:S.trials,caps:S.caps,patient:S.patient,comment:S.comment};
+  const blob=new Blob([JSON.stringify(o)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`VF_作業_${(S.patient.pid||'noID')}_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast('保存しました');
+}
+function loadProject(file){
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const o=JSON.parse(rd.result); if(o.app!=='VF-Support') throw new Error('x');
+      if(S.playing||S.holding) pause();
+      S.fps=o.fps||30; S.mode=o.mode||'normal'; S.baseRate=o.baseRate||1;
+      for(const id of ['A','B']){const v=o.vids[id]; S.vids[id].label=v.label; S.vids[id].off=v.off||0; if(!S.vids[id].loaded) S.vids[id].name=v.name;}
+      S.loop={s:o.loop?o.loop.s:null,e:o.loop?o.loop.e:null,on:false};
+      S.trim={s:o.trim?o.trim.s:null,e:o.trim?o.trim.e:null,on:!!(o.trim&&o.trim.s!=null&&o.trim.e!=null)};
+      S.tracks=(o.tracks||[]).map(t=>({...t,_k:null})); S.trackSel=S.tracks.length?S.tracks[0].id:null;
+      if(o.scale){S.scale=o.scale;} if(o.trackCfg) S.trackCfg=o.trackCfg; S.segs=o.segs||[]; S.holds=o.holds||[]; S.events=o.events||[]; S.trials=o.trials||[]; S.caps=o.caps||[];
+      S.patient=o.patient||{}; S.comment=o.comment||''; S.segDraft={s:null,e:null};
+      syncForm(); seekAll(S.t); renderAll();
+      const need=['A','B'].filter(id=>!S.vids[id].loaded&&o.vids[id].name).map(id=>`${id}：${o.vids[id].name}`);
+      toast(need.length?`読み込みました。動画を開いてください（${need.join(' / ')}）`:'読み込みました',5000);
+      for(const id of ['A','B']) if(!S.vids[id].loaded&&o.vids[id].name) $('#fname'+id).textContent='保存時の動画：'+o.vids[id].name;
+    }catch(e){toast('このファイルは読み込めません');}
+  };
+  rd.readAsText(file);
+}
+function syncForm(){
+  $('#fps').value=S.fps; $('#baseRate').value=String(S.baseRate);
+  $$('input[name=mode]').forEach(r=>r.checked=r.value===S.mode);
+  $('#lblA').value=S.vids.A.label; $('#lblB').value=S.vids.B.label;
+  $$('[data-p]').forEach(el=>el.value=S.patient[el.dataset.p]||'');
+  $('#comment').value=S.comment;
+  $('#regN').style.display=$('#unregN').style.display=S.mode==='normal'?'':'none';
+}
+function renderAll(){renderLoop();renderTrim();renderTracks();renderScale();renderEvents();renderSegs();renderHolds();renderTrials();renderCaps();uiTick();}
+
+/* ========== 初期化とイベント結線 ========== */
+/* ========== メニュー・ガイドツアー・模擬動画 ========== */
+const TOUR=[
+  {sel:null,t:'ようこそ（約1分のガイドです）',b:'このツールでできることを、順番にご案内します。<br>「次へ」ボタンは、<b>画面の上の中央</b>に固定してあります。そこを押し続けるだけで進めます（キーボードの→やEnterでも進みます）。'},
+  {sel:'#videos',t:'① 動画を開く',b:'左（A）と右（B）の<b>表示欄をクリック</b>すると、動画を選べます（ドラッグでも可）。<br>A＝正常例、B＝当日の検査動画が基本です。画面上部で「前後で比べる」にも切り替えられます。'},
+  {sel:'#videos .vbox:nth-child(2) .align',t:'② 位置合わせ',b:'<b>同じ瞬間をそろえる</b>ためのバーです（例：嚥下反射が始まる瞬間）。このバーで一方の動画だけを動かせます。<br>先にそろえておくと、あとの設定がずれません。'},
+  {sel:'.transport',t:'③ 再生とコマ送り',b:'再生・一時停止、1コマ／10コマ送り、速度変更ができます。<br>キーボードは、スペース＝再生／停止、← →＝1コマです。'},
+  {sel:'.tlwrap',t:'④ タイムライン',b:'クリックやドラッグで、好きな位置へ移動できます。<br>オレンジの帯＝スロー区間、青＝停止演出、丸印＝イベント、緑の帯＝ループです。'},
+  {sel:'#lpBox',t:'⑤ ループ',b:'<b>始点</b>と<b>終点</b>を決めると、その区間をくり返し再生します。気になる場面を何度も見るときに使います。'},
+  {sel:'#trBox',t:'⑥ トリミング',b:'長い動画の<b>一部だけ</b>をタイムラインに大きく表示します。「リセット」で全体に戻ります。軌跡を追う範囲も、これで絞れます。'},
+  {sel:'.edit',t:'⑦ スロー区間・停止演出',b:'この2つの欄は、クリックで開きます。<br><b>スロー区間</b>：指定した区間だけゆっくり再生。<br><b>停止演出</b>：指定コマで1・3・5秒止めて、矢印・コメント・目印を書き込めます（説明や教育用）。'},
+  {sel:'aside',tab:'tabEv',t:'⑧ イベントの記録',b:'嚥下反射開始・喉頭閉鎖・UES開大・誤嚥などのボタンで、<b>今のコマの時刻</b>を記録します。<br>タイムラインにも印が出ます。記録の間隔も自動で計算されます。'},
+  {sel:'aside',tab:'tabEval',t:'⑨ 評価（PAS・残留）',b:'患者情報と、食形態ごとの<b>PAS</b>・喉頭蓋谷／梨状陥凹の残留、総合コメントを入力します。入力内容はレポートに入ります。'},
+  {sel:'aside',tab:'tabTrk',t:'⑩ 軌跡・計測',b:'舌骨などの動きを追って、<b>軌跡</b>を表示します。自動で追う方法と、クリックで追う<b>手動</b>の方法があります。<br>頸椎（C2〜C4）を基準にして、mmや%で挙上量・速度も出せます。'},
+  {sel:'aside',tab:'tabOut',t:'⑪ 画像・出力',b:'<b>画像キャプチャ</b>、<b>PDFレポート</b>、<b>編集動画の書き出し</b>（スロー・停止・書き込み・軌跡が入ります）、作業内容の保存・読み込みができます。'},
+  {sel:'#menuBtn',tab:'tabEv',t:'困ったときは',b:'この<b>☰メニュー</b>に、VFで見るポイント・検査の手順・用語の説明・使い方があります。ガイドツアーは、一番右の「使い方・ツアー」からもう一度見られます。'}
+];
+const TR={on:false,i:0};
+function tourPlace(card,r){
+  const m=12, vw=innerWidth, vh=innerHeight, cw=card.offsetWidth, ch=card.offsetHeight;
+  const cand=[
+    [r.left+r.width/2-cw/2, r.bottom+m],[r.left+r.width/2-cw/2, r.top-ch-m],
+    [r.right+m, r.top],[r.left-cw-m, r.top],[vw/2-cw/2, vh/2-ch/2]
+  ];
+  let pos=cand.find(([x,y])=>x>=8&&y>=54&&x+cw<=vw-8&&y+ch<=vh-8)||cand[4];
+  card.style.left=clamp(pos[0],8,vw-cw-8)+'px'; card.style.top=clamp(pos[1],54,vh-ch-8)+'px';
+}
+function tourShow(i){
+  TR.i=clamp(i,0,TOUR.length-1); const st=TOUR[TR.i];
+  if(st.tab){ const b=$(`.tabs button[data-tab="${st.tab}"]`); if(b) b.click(); }
+  const hl=$('#tourHl'), card=$('#tourCard');
+  $('#tourT').textContent=st.t; $('#tourB').innerHTML=st.b; $('#tourC').textContent=`${TR.i+1} / ${TOUR.length}`;
+  $('#tourPrev').style.visibility=TR.i?'visible':'hidden';
+  $('#tourNext').textContent=TR.i===TOUR.length-1?'完了 ✓':'次へ ▶';
+  const el=st.sel?$(st.sel):null;
+  hl.style.display='block'; card.style.display='block'; $('#tourNav').style.display='flex';
+  if(el){
+    el.scrollIntoView({block:'nearest',inline:'nearest'});
+    const r=el.getBoundingClientRect(), pad=6;
+    hl.style.left=(r.left-pad)+'px'; hl.style.top=(r.top-pad)+'px'; hl.style.width=(r.width+pad*2)+'px'; hl.style.height=(r.height+pad*2)+'px';
+    requestAnimationFrame(()=>tourPlace(card,r));
+  }else{
+    hl.style.left=(innerWidth/2)+'px'; hl.style.top=(innerHeight/2)+'px'; hl.style.width='0'; hl.style.height='0';
+    requestAnimationFrame(()=>tourPlace(card,{left:innerWidth/2,right:innerWidth/2,top:innerHeight/2,bottom:innerHeight/2,width:0,height:0}));
+  }
+}
+function tourStart(){ TR.on=true; $('#tourBlock').style.display='block'; closeDrawer(); tourShow(0); }
+function tourEnd(){
+  TR.on=false; for(const id of ['tourBlock','tourHl','tourCard','tourNav']) $('#'+id).style.display='none';
+  try{localStorage.setItem('vf_tour_seen','1');}catch(e){}
+  const b=$('.tabs button[data-tab="tabEv"]'); if(b) b.click();
+}
+function openDrawer(tab){ $('#drawer').classList.add('show'); $('#drawerBg').classList.add('show'); if(tab) drawerTab(tab); }
+function closeDrawer(){ $('#drawer').classList.remove('show'); $('#drawerBg').classList.remove('show'); }
+function drawerTab(id){
+  $$('.dtabs button').forEach(b=>b.classList.toggle('on',b.dataset.dt===id));
+  $$('.dsec').forEach(d=>d.classList.toggle('on',d.id===id));
+  $('.dbody').scrollTop=0;
+}
+function initHelp(){
+  $('#menuBtn').onclick=()=>openDrawer();
+  $('#drClose').onclick=closeDrawer; $('#drawerBg').onclick=closeDrawer;
+  $$('.dtabs button').forEach(b=>b.onclick=()=>drawerTab(b.dataset.dt));
+  $('#drTour').onclick=tourStart;
+  $('#tourNext').onclick=()=>{ if(TR.i>=TOUR.length-1) tourEnd(); else tourShow(TR.i+1); };
+  $('#tourPrev').onclick=()=>tourShow(TR.i-1);
+  $('#tourSkip').onclick=tourEnd;
+  addEventListener('resize',()=>{ if(TR.on) tourShow(TR.i); });
+  document.addEventListener('keydown',e=>{
+    if(TR.on){ e.preventDefault(); e.stopImmediatePropagation();
+      if(e.key==='Escape') tourEnd(); else if(e.key==='ArrowRight'||e.key==='Enter'){ $('#tourNext').click(); } else if(e.key==='ArrowLeft'&&TR.i) tourShow(TR.i-1); return; }
+    if($('#drawer').classList.contains('show')){ if(e.key==='Escape'){closeDrawer();} e.stopImmediatePropagation(); }
+  },true);
+  let seen=false; try{seen=!!localStorage.getItem('vf_tour_seen');}catch(e){}
+  if(!seen) setTimeout(tourStart,500);
+}
+
+function init(){
+  $('#videos').innerHTML=makeBox('A')+makeBox('B');
+  S.vids.A.el=$('#vA'); S.vids.B.el=$('#vB');
+  $('#evBtns').innerHTML=EVENTS.map(e=>`<button class="evbtn" data-ev="${e.n}" title="${e.h}"><span class="dot" style="background:${e.c}"></span><span><b>${e.n}</b><small>${e.h}</small></span></button>`).join('');
+  $('#pDate').value=new Date().toISOString().slice(0,10); S.patient.date=$('#pDate').value;
+  S.trials.push(newTrial());
+  syncForm(); bindOverlay('A'); bindOverlay('B');
+  const setVh=v=>document.documentElement.style.setProperty('--vh',v+'vh');
+  try{const sv=localStorage.getItem('vf_vh'); if(sv){$('#vhSel').value=sv;}}catch(e){}
+  setVh($('#vhSel').value);
+  $('#vhSel').onchange=e=>{setVh(e.target.value); try{localStorage.setItem('vf_vh',e.target.value);}catch(err){} uiTick();};
+  for(const id of ['A','B']) $('#ph'+id).addEventListener('click',()=>openPicker(id));
+
+  // ファイル
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('[data-open]'); if(b) openPicker(b.dataset.open);
+  });
+  $('#fileIn').addEventListener('change',e=>{const f=e.target.files[0]; if(f) loadVideo(pickTarget,f);});
+  for(const id of ['A','B']){
+    const st=$('#stage'+id);
+    st.addEventListener('dragover',e=>{e.preventDefault();st.classList.add('dragover');});
+    st.addEventListener('dragleave',()=>st.classList.remove('dragover'));
+    st.addEventListener('drop',e=>{e.preventDefault();st.classList.remove('dragover');const f=e.dataTransfer.files[0]; if(f) loadVideo(id,f);});
+    $('#lbl'+id).addEventListener('input',e=>{S.vids[id].label=e.target.value;});
+  }
+  window.addEventListener('dragover',e=>e.preventDefault());
+  window.addEventListener('drop',e=>e.preventDefault());
+  $('#regN').onclick=registerNormal; $('#unregN').onclick=unregisterNormal;
+
+  // モード
+  $$('input[name=mode]').forEach(r=>r.addEventListener('change',()=>{
+    const old=S.mode; S.mode=r.value;
+    const def={normal:['正常例','当日検査'],prepost:['前','後']};
+    ['A','B'].forEach((id,i)=>{ if(S.vids[id].label===def[old][i]){S.vids[id].label=def[S.mode][i];$('#lbl'+id).value=def[S.mode][i];} });
+    $('#regN').style.display=$('#unregN').style.display=S.mode==='normal'?'':'none';
+  }));
+
+  // 再生
+  $('#bPlay').onclick=()=>{ (S.playing||S.holding)?pause():play(); };
+  $('#bStart').onclick=()=>{ if(S.playing||S.holding) pause(); seekAll(tRange()[0]); uiTick(); };
+  $$('[data-step]').forEach(b=>b.onclick=()=>step(+b.dataset.step));
+  $('#baseRate').onchange=e=>{S.baseRate=+e.target.value;};
+  $('#fps').onchange=e=>{S.fps=clamp(Math.round(+e.target.value)||30,1,120); e.target.value=S.fps; seekAll(S.t); renderAll();};
+
+  // 位置合わせ
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-al]'); if(b) alignBy(b.dataset.al,+b.dataset.d);});
+  for(const id of ['A','B']){
+    $('#al'+id).addEventListener('input',e=>{
+      const V=S.vids[id]; if(!V.loaded) return;
+      if(S.playing||S.holding) pause();
+      V.off=Math.round((+e.target.value-S.t)*S.fps)/S.fps;
+      seekAll(S.t); uiTick();
+    });
+    $('#al'+id).addEventListener('change',()=>{renderEvents();});
+  }
+
+  // タイムライン
+  const tl=$('#tl');
+  tl.addEventListener('pointerdown',e=>{tl.setPointerCapture(e.pointerId);S.tlDrag=true;if(S.playing||S.holding)pause();tlSeek(e);});
+  tl.addEventListener('pointermove',e=>{if(S.tlDrag)tlSeek(e);});
+  tl.addEventListener('pointerup',()=>{S.tlDrag=false;}); tl.addEventListener('pointercancel',()=>{S.tlDrag=false;});
+
+  // スロー区間
+  const segS=()=>{if(!loadedIds().length)return; if(S.playing||S.holding)pause(); S.segDraft.s=S.t; renderSegs(); drawTL();};
+  const segE=()=>{if(!loadedIds().length)return; if(S.playing||S.holding)pause(); S.segDraft.e=S.t; renderSegs(); drawTL();};
+  $('#segS').onclick=segS; $('#segE').onclick=segE;
+  $('#segAdd').onclick=()=>{
+    const d=S.segDraft;
+    if(d.s==null||d.e==null||d.e<=d.s){toast('開始点と終了点を、開始＜終了になるように設定してください');return;}
+    S.segs.push({id:uid(),s:d.s,e:d.e,rate:+$('#segRate').value}); S.segs.sort((a,b)=>a.s-b.s);
+    S.segDraft={s:null,e:null}; renderSegs(); drawTL(); toast('スロー区間を追加しました');
+  };
+  $('#segList').addEventListener('click',e=>{
+    const p=e.target.closest('[data-seg-play]'), d=e.target.closest('[data-seg-del]'), lq=e.target.closest('[data-seg-loop]');
+    if(lq){const g=S.segs.find(x=>x.id===lq.dataset.segLoop); if(g){ if(S.playing||S.holding)pause(); S.loop={s:g.s,e:g.e,on:true}; seekAll(g.s); renderLoop(); play(); }}
+    if(p){const s=S.segs.find(x=>x.id===p.dataset.segPlay); if(s){ if(S.playing||S.holding)pause(); seekAll(Math.max(tRange()[0],s.s-0.5)); play(); }}
+    if(d){S.segs=S.segs.filter(x=>x.id!==d.dataset.segDel); renderSegs(); drawTL();}
+  });
+
+  // 停止演出と書き込み
+  $('#holdAdd').onclick=()=>{
+    if(!loadedIds().length){toast('先に動画を開いてください');return;}
+    if(S.playing||S.holding)pause();
+    const h=activeHold(); if(h){h.dur=+$('#holdDur').value; toast(`停止の長さを${h.dur}秒にしました`);} else ensureHold();
+    renderHolds(); uiTick();
+  };
+  $$('.tool').forEach(b=>b.onclick=()=>{
+    const n=b.dataset.tool;
+    if(n==='fix'&&!S.tracks.find(t=>t.id===S.trackSel)){toast('直したい点を、②の一覧から選んでください');return;}
+    setTool(S.tool===n&&n!=='none'?'none':n);
+    if(S.tool==='track') toast('追いたい点を、動画の上でクリックしてください');
+    if(S.tool==='manual') toast('追いたい点を、動画の上でクリックしてください。クリックのたびに次のコマへ進みます（Escで終了）',5000);
+    if(S.tool==='scale'){S.scaleDraft=null; toast('1点目（下側：C4の前下角など）→ 2点目（上側：C2の前下角など）の順にクリック',5000);}
+    if(S.tool==='fix') toast('正しい位置を、動画の上でクリックしてください');
+  });
+  $$('.sw').forEach(b=>b.onclick=()=>{S.color=b.dataset.color;$$('.sw').forEach(x=>x.classList.toggle('on',x===b));});
+  $('#annUndo').onclick=()=>{const h=activeHold(); if(h&&h.ann.length){h.ann.pop();renderHolds();uiTick();}};
+  $('#annClear').onclick=()=>{const h=activeHold(); if(h&&h.ann.length){h.ann=[];renderHolds();uiTick();}};
+  $('#holdList').addEventListener('click',e=>{
+    const g=e.target.closest('[data-hold-go]'), d=e.target.closest('[data-hold-del]');
+    if(g){e.preventDefault(); const h=S.holds.find(x=>x.id===g.dataset.holdGo); if(h){const was=S.playing||S.holding; if(was)pause(); seekAll(h.t); uiTick(); if(was)play();}}
+    if(d){S.holds=S.holds.filter(x=>x.id!==d.dataset.holdDel); renderHolds(); uiTick();}
+  });
+
+  // イベント
+  $$('input[name=evT]').forEach(r=>r.onchange=()=>{S.evTarget=r.value;});
+  $('#evBtns').addEventListener('click',e=>{const b=e.target.closest('[data-ev]'); if(b) recordEvent(b.dataset.ev);});
+  $('#evList').addEventListener('click',e=>{
+    const g=e.target.closest('[data-ev-go]'), d=e.target.closest('[data-ev-del]');
+    if(g){const ev=S.events.find(x=>x.id===g.dataset.evGo); if(ev&&S.vids[ev.panel].loaded){const was=S.playing||S.holding; if(was)pause(); seekAll(ev.vt-S.vids[ev.panel].off); uiTick(); if(was)play();}}
+    if(d){S.events=S.events.filter(x=>x.id!==d.dataset.evDel); renderEvents(); drawTL();}
+  });
+
+  // タブ
+  $$('.tabs button').forEach(b=>b.onclick=()=>{
+    $$('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+    $$('.tab').forEach(t=>t.classList.toggle('on',t.id===b.dataset.tab));
+  });
+
+  // 評価
+  $$('[data-p]').forEach(el=>el.addEventListener('input',()=>{S.patient[el.dataset.p]=el.value;}));
+  $('#comment').addEventListener('input',e=>{S.comment=e.target.value;});
+  $('#trialAdd').onclick=()=>{S.trials.push(newTrial());renderTrials();};
+  $('#trials').addEventListener('input',e=>{
+    const card=e.target.closest('.trial'); if(!card||!e.target.dataset.k) return;
+    const t=S.trials.find(x=>x.id===card.dataset.id); if(t) t[e.target.dataset.k]=e.target.value;
+  });
+  $('#trials').addEventListener('click',e=>{const d=e.target.closest('[data-trial-del]'); if(d){S.trials=S.trials.filter(x=>x.id!==d.dataset.trialDel);renderTrials();}});
+
+  // 画像・出力
+  $('#capBtn').onclick=capture;
+  $('#caps').addEventListener('click',e=>{const d=e.target.closest('[data-cap-del]'); if(d){S.caps=S.caps.filter(x=>x.id!==d.dataset.capDel);renderCaps();}});
+  $('#caps').addEventListener('input',e=>{if(!e.target.hasAttribute('data-capcap'))return; const c=S.caps.find(x=>x.id===e.target.closest('.cap').dataset.id); if(c)c.cap=e.target.value;});
+  $('#repBtn').onclick=()=>{ if(S.playing||S.holding)pause(); $('#repBody').innerHTML=buildReport(); $('#reportOverlay').classList.add('show'); };
+  $('#repClose').onclick=()=>$('#reportOverlay').classList.remove('show');
+  $('#repPrint').onclick=()=>window.print();
+  $('#saveBtn').onclick=saveProject;
+  $('#loadBtn').onclick=()=>{$('#projIn').value='';$('#projIn').click();};
+  $('#projIn').addEventListener('change',e=>{const f=e.target.files[0]; if(f) loadProject(f);});
+
+  // 折りたたみ（初期は閉じる）
+  let accSt={}; try{accSt=JSON.parse(localStorage.getItem('vf_acc')||'{}');}catch(e){}
+  for(const id of ['acc1','acc2']){
+    const box=$('#'+id); box.classList.toggle('open',!!accSt[id]);
+    $('.acch',box).addEventListener('click',()=>{
+      box.classList.toggle('open'); accSt[id]=box.classList.contains('open');
+      try{localStorage.setItem('vf_acc',JSON.stringify(accSt));}catch(e){}
+    });
+  }
+  // ループ・書き出し
+  $('#lpS').onclick=()=>setLoopPoint('s'); $('#lpE').onclick=()=>setLoopPoint('e');
+  $('#lpOn').onclick=()=>{
+    const L=S.loop; if(L.s==null||L.e==null||L.e<=L.s){toast('先にループの始点と終点を設定してください');return;}
+    L.on=!L.on; renderLoop();
+  };
+  $('#trS').onclick=()=>setTrimPoint('s'); $('#trE').onclick=()=>setTrimPoint('e'); $('#trR').onclick=resetTrim;
+  $('#trLp').onclick=()=>{ const L=S.loop; if(L.s==null||L.e==null||L.e<=L.s){toast('先にループの始点と終点を設定してください');return;} S.trim={s:L.s,e:L.e,on:true}; seekAll(S.t); renderTrim(); uiTick(); };
+  // 軌跡・計測
+  $('#trkList').addEventListener('click',e=>{
+    const d=e.target.closest('[data-trk-del]'), sh=e.target.closest('[data-trk-show]'), row=e.target.closest('[data-trk]');
+    if(d){ S.tracks=S.tracks.filter(t=>t.id!==d.dataset.trkDel); if(S.trackSel===d.dataset.trkDel) S.trackSel=S.tracks.length?S.tracks[0].id:null; renderTracks(); uiTick(); }
+    else if(sh){ const t=S.tracks.find(x=>x.id===sh.dataset.trkShow); if(t){t.show=!t.show; renderTracks(); uiTick();} }
+    else if(row){ S.trackSel=row.dataset.trk; renderTracks(); uiTick(); }
+  });
+  $$('input[name=trkStyle]').forEach(r=>r.onchange=()=>{S.trackStyle=r.value;uiTick();});
+  $('#trkUpTo').onchange=e=>{S.trackUpTo=e.target.checked;uiTick();};
+  $('#trkRad').onchange=e=>{S.trackCfg.rad=+e.target.value;}; $('#trkTs').onchange=e=>{S.trackCfg.ts=+e.target.value;};
+  $('#trkUpd').onchange=e=>{S.trackCfg.upd=e.target.checked;}; $('#trkFace').onchange=e=>{S.trackCfg.face=e.target.value;renderMetrics();};
+  $('#trkPrev').onclick=()=>jumpFlag(-1); $('#trkNext').onclick=()=>jumpFlag(1);
+  $('#trkCancel').onclick=()=>{S.trkCancel=true;};
+  $('#trkRest').onclick=()=>{
+    const tr=S.tracks.find(t=>t.id===S.trackSel); if(!tr){toast('点を選んでください');return;}
+    const f=panelFrame(tr.panel); if(!tr.pts[f]){toast('このコマは追跡されていません');return;}
+    tr.restF=f; renderMetrics(); uiTick();
+  };
+  $$('input[name=scP]').forEach(r=>r.onchange=()=>{S.scPanel=r.value;renderScale();});
+  $('#scMethod').onchange=e=>{const sc=S.scale[S.scPanel]; sc.method=e.target.value; if(sc.method==='c24') sc.mm=SEX_MM[sc.sex]; renderScale(); renderMetrics(); uiTick();};
+  $('#scSex').onchange=e=>{const sc=S.scale[S.scPanel]; sc.sex=e.target.value; sc.mm=SEX_MM[sc.sex]; renderScale(); renderMetrics(); uiTick();};
+  $('#scMM').oninput=e=>{const v=parseFloat(e.target.value); if(v>0){S.scale[S.scPanel].mm=v; renderMetrics(); uiTick();}};
+  $('#scClr').onclick=()=>{const sc=S.scale[S.scPanel]; sc.p1=sc.p2=null; S.scaleDraft=null; renderScale(); renderMetrics(); uiTick();};
+  $('#lpClr').onclick=()=>{S.loop={s:null,e:null,on:false}; renderLoop();};
+  $('#expBtn').onclick=startExport;
+  $('#expCancel').onclick=()=>finishExport(false);
+  document.addEventListener('visibilitychange',()=>{
+    const E=S.exp; if(!E) return;
+    if(document.hidden) E.hidden=true; else if(E.hidden && !E.finishing) finishExport(false);
+  });
+
+  // キーボード
+  document.addEventListener('keydown',e=>{
+    if(S.exporting||S.tracking) return;
+    if(e.key==='Escape'&&S.tool!=='none'){setTool('none');return;}
+    const t=e.target, tag=t.tagName;
+    if(tag==='TEXTAREA'||tag==='SELECT'||(tag==='INPUT'&&t.type!=='range'&&t.type!=='radio'&&t.type!=='checkbox')) return;
+    if($('#reportOverlay').classList.contains('show')) return;
+    if(e.code==='Space'){e.preventDefault(); (S.playing||S.holding)?pause():play();}
+    else if(e.key==='ArrowLeft'){e.preventDefault(); step(e.shiftKey?-10:-1);}
+    else if(e.key==='ArrowRight'){e.preventDefault(); step(e.shiftKey?10:1);}
+    else if(e.key==='Home'){e.preventDefault(); $('#bStart').click();}
+    else if(e.key==='['){$('#segS').click();}
+    else if(e.key===']'){$('#segE').click();}
+  });
+
+  new ResizeObserver(()=>uiTick()).observe(document.body);
+  renderAll();
+  restoreNormal();
+  initHelp();
+}
+init();
+</script>
+</body>
+</html>
