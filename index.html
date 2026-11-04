@@ -511,7 +511,7 @@ table.t th{color:var(--sub);font-weight:600;font-size:11.5px}
       <li><b>動画が再生できない</b>：H.264のMP4かWebMでお試しください。</li>
       <li><b>画面が見切れる</b>：上部の「動画の高さ」を「標準」にし、下の編集欄は折りたたんでおけます。</li>
       <li><b>前回の続きをしたい</b>：「画像・出力」タブの「作業内容を保存／読み込む」を使います（動画ファイルは含まれません）。</li>
-      <li><b>正常例を毎回使う</b>：動画Aを開いて「正常例として登録」を押すと、次回から自動で読み込まれます。</li>
+      <li><b>正常例を毎回使う</b>：動画Aを開いて「登録」を押すと、次回から自動で読み込まれます。</li>
     </ul>
   </div>
 
@@ -1022,7 +1022,7 @@ function makeBox(id){
     <span class="chip ${id}">${id}</span>
     <input class="lbl" id="lbl${id}" title="この動画の呼び名">
     <button class="btn sm" data-open="${id}">動画を開く</button>
-    ${id==='A'?'<button class="btn sm" id="regN" title="この動画を正常例として、このブラウザに保存します">正常例として登録</button><button class="btn sm" id="unregN" title="登録を解除します">解除</button>':''}
+    ${id==='A'?'<button class="btn sm" id="regN" title="この動画を正常例として、この端末（ブラウザ）に保存します。次回から自動で読み込まれます">登録</button><button class="btn sm" id="unregN" title="登録を解除します">解除</button>':''}
     <span class="fname" id="fname${id}"></span>
   </div>
   <div class="stage" id="stage${id}">
