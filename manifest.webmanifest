@@ -1,0 +1,16 @@
+{
+  "name": "VF分析支援ツール",
+  "short_name": "VF分析",
+  "description": "嚥下造影検査（VF）の動画を比較・分析する支援ツール（評価・教育の補助用）",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#12333a",
+  "theme_color": "#12333a",
+  "lang": "ja",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
